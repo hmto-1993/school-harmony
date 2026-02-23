@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CircleCheck, CircleMinus, CircleX } from "lucide-react";
+import { Save, CircleCheck, CircleMinus, CircleX, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GradeCategory {
@@ -31,6 +32,11 @@ const gradeLevelConfig: Record<GradeLevel, { label: string; icon: typeof CircleC
   zero: { label: "صفر", icon: CircleX, colorClass: "text-red-500" },
 };
 
+// Categories that use numeric input instead of icons
+const NUMERIC_CATEGORIES = ["اختبار عملي", "اختبار الفترة"];
+
+const isNumericCategory = (name: string) => NUMERIC_CATEGORIES.includes(name);
+
 const getGradeLevel = (score: number | null, maxScore: number): GradeLevel | null => {
   if (score === null || score === undefined) return null;
   const pct = (score / maxScore) * 100;
@@ -39,12 +45,11 @@ const getGradeLevel = (score: number | null, maxScore: number): GradeLevel | nul
   return "zero";
 };
 
-const getLevelScore = (level: GradeLevel, maxScore: number): number => {
-  switch (level) {
-    case "excellent": return maxScore;
-    case "average": return Math.round(maxScore / 2);
-    case "zero": return 0;
-  }
+// Increment values for icon-based categories
+const LEVEL_INCREMENT: Record<GradeLevel, number> = {
+  excellent: 10,
+  average: 5,
+  zero: 0,
 };
 
 export default function DailyGradeEntry() {
@@ -107,12 +112,38 @@ export default function DailyGradeEntry() {
     );
   };
 
-  const setGradeByLevel = (studentId: string, categoryId: string, level: GradeLevel, maxScore: number) => {
-    const score = getLevelScore(level, maxScore);
+  const addGradeByLevel = (studentId: string, categoryId: string, level: GradeLevel, maxScore: number) => {
+    setStudentGrades((prev) =>
+      prev.map((sg) => {
+        if (sg.student_id !== studentId) return sg;
+        const current = sg.grades[categoryId] ?? 0;
+        let newScore: number;
+        if (level === "zero") {
+          newScore = 0;
+        } else {
+          newScore = Math.min(current + LEVEL_INCREMENT[level], maxScore);
+        }
+        return { ...sg, grades: { ...sg.grades, [categoryId]: newScore } };
+      })
+    );
+  };
+
+  const clearGrade = (studentId: string, categoryId: string) => {
     setStudentGrades((prev) =>
       prev.map((sg) =>
         sg.student_id === studentId
-          ? { ...sg, grades: { ...sg.grades, [categoryId]: score } }
+          ? { ...sg, grades: { ...sg.grades, [categoryId]: null } }
+          : sg
+      )
+    );
+  };
+
+  const setNumericGrade = (studentId: string, categoryId: string, value: string, maxScore: number) => {
+    const num = value === "" ? null : Math.min(Math.max(0, Number(value)), maxScore);
+    setStudentGrades((prev) =>
+      prev.map((sg) =>
+        sg.student_id === studentId
+          ? { ...sg, grades: { ...sg.grades, [categoryId]: num } }
           : sg
       )
     );
@@ -223,9 +254,16 @@ export default function DailyGradeEntry() {
                   <div key={key} className="flex items-center gap-1.5">
                     <Icon className={cn("h-5 w-5", cfg.colorClass)} />
                     <span>{cfg.label}</span>
+                    {key !== "zero" && (
+                      <span className="text-muted-foreground text-xs">(+{LEVEL_INCREMENT[key as GradeLevel]})</span>
+                    )}
                   </div>
                 );
               })}
+              <div className="flex items-center gap-1.5">
+                <Undo2 className="h-4 w-4 text-muted-foreground" />
+                <span>تراجع</span>
+              </div>
             </div>
 
             <div className="rounded-lg border overflow-x-auto">
@@ -253,6 +291,29 @@ export default function DailyGradeEntry() {
                       {visibleCategories.map((cat) => {
                         const maxScore = Number(cat.max_score);
                         const currentScore = sg.grades[cat.id];
+                        const isNumeric = isNumericCategory(cat.name);
+
+                        if (isNumeric) {
+                          return (
+                            <TableCell key={cat.id} className="text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={maxScore}
+                                  value={currentScore ?? ""}
+                                  onChange={(e) => setNumericGrade(sg.student_id, cat.id, e.target.value, maxScore)}
+                                  className="w-20 text-center h-8"
+                                  placeholder={`/${maxScore}`}
+                                />
+                                <span className="text-xs text-muted-foreground min-w-[36px]">
+                                  {calcPercentage(currentScore, maxScore)}
+                                </span>
+                              </div>
+                            </TableCell>
+                          );
+                        }
+
                         const currentLevel = getGradeLevel(currentScore, maxScore);
 
                         return (
@@ -260,29 +321,36 @@ export default function DailyGradeEntry() {
                             <div className="flex items-center justify-center gap-1">
                               {(Object.entries(gradeLevelConfig) as [GradeLevel, typeof gradeLevelConfig.excellent][]).map(([level, cfg]) => {
                                 const Icon = cfg.icon;
-                                const isActive = currentLevel === level;
                                 return (
                                   <button
                                     key={level}
                                     type="button"
-                                    onClick={() => setGradeByLevel(sg.student_id, cat.id, level as GradeLevel, maxScore)}
+                                    onClick={() => addGradeByLevel(sg.student_id, cat.id, level as GradeLevel, maxScore)}
                                     className={cn(
                                       "p-1 rounded-md transition-all hover:scale-110",
-                                      isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-30 hover:opacity-70"
+                                      "opacity-50 hover:opacity-100"
                                     )}
-                                    title={cfg.label}
+                                    title={`${cfg.label} (+${LEVEL_INCREMENT[level as GradeLevel]})`}
                                   >
                                     <Icon className={cn("h-6 w-6", cfg.colorClass)} />
                                   </button>
                                 );
                               })}
+                              <button
+                                type="button"
+                                onClick={() => clearGrade(sg.student_id, cat.id)}
+                                className="p-1 rounded-md transition-all hover:scale-110 opacity-40 hover:opacity-100"
+                                title="تراجع"
+                              >
+                                <Undo2 className="h-5 w-5 text-muted-foreground" />
+                              </button>
                               <span className={cn(
                                 "mr-2 text-sm font-semibold min-w-[36px]",
                                 currentLevel === "excellent" ? "text-green-600" :
                                 currentLevel === "average" ? "text-yellow-600" :
                                 currentLevel === "zero" ? "text-red-600" : "text-muted-foreground"
                               )}>
-                                {calcPercentage(currentScore, maxScore)}
+                                {currentScore !== null && currentScore !== undefined ? `${currentScore}/${maxScore}` : "—"}
                               </span>
                             </div>
                           </TableCell>
