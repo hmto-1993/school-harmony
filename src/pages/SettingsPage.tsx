@@ -90,6 +90,13 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // New teacher form
+  const [newTeacherName, setNewTeacherName] = useState("");
+  const [newTeacherEmail, setNewTeacherEmail] = useState("");
+  const [newTeacherPassword, setNewTeacherPassword] = useState("");
+  const [newTeacherNationalId, setNewTeacherNationalId] = useState("");
+  const [creatingTeacher, setCreatingTeacher] = useState(false);
+
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [categories, setCategories] = useState<GradeCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,6 +215,42 @@ export default function SettingsPage() {
       setNewPassword("");
       setSelectedTeacher("");
     }
+  };
+
+  const handleCreateTeacher = async () => {
+    if (!newTeacherName.trim() || !newTeacherEmail.trim() || !newTeacherPassword.trim()) return;
+    setCreatingTeacher(true);
+
+    const { data, error } = await supabase.functions.invoke("manage-users", {
+      body: {
+        action: "create_user",
+        email: newTeacherEmail,
+        password: newTeacherPassword,
+        full_name: newTeacherName,
+        role: "teacher",
+      },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "خطأ", description: data?.error || "فشل في إنشاء الحساب", variant: "destructive" });
+      setCreatingTeacher(false);
+      return;
+    }
+
+    if (newTeacherNationalId.trim() && data?.user_id) {
+      await supabase
+        .from("profiles")
+        .update({ national_id: newTeacherNationalId })
+        .eq("user_id", data.user_id);
+    }
+
+    toast({ title: "تم الإنشاء", description: `تم إنشاء حساب ${newTeacherName} بنجاح` });
+    setNewTeacherName("");
+    setNewTeacherEmail("");
+    setNewTeacherPassword("");
+    setNewTeacherNationalId("");
+    setCreatingTeacher(false);
+    fetchData();
   };
 
   const handleAddClass = async () => {
@@ -337,10 +380,16 @@ export default function SettingsPage() {
             الملف الشخصي
           </TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="passwords" className="gap-1.5">
-              <KeyRound className="h-4 w-4" />
-              كلمات المرور
-            </TabsTrigger>
+            <>
+              <TabsTrigger value="passwords" className="gap-1.5">
+                <KeyRound className="h-4 w-4" />
+                كلمات المرور
+              </TabsTrigger>
+              <TabsTrigger value="new-teacher" className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                إضافة معلم
+              </TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -697,48 +746,108 @@ export default function SettingsPage() {
         </TabsContent>
         {/* ===== كلمات المرور ===== */}
         {isAdmin && (
-          <TabsContent value="passwords">
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="text-lg">تغيير كلمة مرور المعلم</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 max-w-md">
-                <div className="space-y-2">
-                  <Label>اختر المعلم</Label>
-                  <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر المعلم" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.map((t) => (
-                        <SelectItem key={t.user_id} value={t.user_id}>
-                          {t.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>كلمة المرور الجديدة</Label>
-                  <Input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="أدخل كلمة المرور الجديدة"
-                    dir="ltr"
-                  />
-                </div>
-                <Button
-                  onClick={handleChangePassword}
-                  disabled={changingPassword || !selectedTeacher || !newPassword.trim()}
-                  className="gap-1.5"
-                >
-                  <KeyRound className="h-4 w-4" />
-                  {changingPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <>
+            <TabsContent value="passwords">
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="text-lg">تغيير كلمة مرور المعلم</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label>اختر المعلم</Label>
+                    <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر المعلم" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teachers.map((t) => (
+                          <SelectItem key={t.user_id} value={t.user_id}>
+                            {t.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>كلمة المرور الجديدة</Label>
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="أدخل كلمة المرور الجديدة"
+                      dir="ltr"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleChangePassword}
+                    disabled={changingPassword || !selectedTeacher || !newPassword.trim()}
+                    className="gap-1.5"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    {changingPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="new-teacher">
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="text-lg">إنشاء حساب معلم جديد</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label>الاسم الكامل</Label>
+                    <Input
+                      value={newTeacherName}
+                      onChange={(e) => setNewTeacherName(e.target.value)}
+                      placeholder="اسم المعلم"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>البريد الإلكتروني</Label>
+                    <Input
+                      type="email"
+                      value={newTeacherEmail}
+                      onChange={(e) => setNewTeacherEmail(e.target.value)}
+                      placeholder="teacher@school.edu.sa"
+                      dir="ltr"
+                      className="text-right"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>رقم الهوية الوطنية</Label>
+                    <Input
+                      value={newTeacherNationalId}
+                      onChange={(e) => setNewTeacherNationalId(e.target.value)}
+                      placeholder="1XXXXXXXXX"
+                      dir="ltr"
+                      className="text-right"
+                      inputMode="numeric"
+                    />
+                    <p className="text-xs text-muted-foreground">يُستخدم لتسجيل الدخول</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>كلمة المرور</Label>
+                    <Input
+                      type="password"
+                      value={newTeacherPassword}
+                      onChange={(e) => setNewTeacherPassword(e.target.value)}
+                      placeholder="كلمة المرور"
+                      dir="ltr"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleCreateTeacher}
+                    disabled={creatingTeacher || !newTeacherName.trim() || !newTeacherEmail.trim() || !newTeacherPassword.trim()}
+                    className="gap-1.5"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {creatingTeacher ? "جارٍ الإنشاء..." : "إنشاء الحساب"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </>
         )}
       </Tabs>
     </div>
