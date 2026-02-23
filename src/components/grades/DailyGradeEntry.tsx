@@ -28,6 +28,7 @@ export default function DailyGradeEntry() {
   const { toast } = useToast();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [selectedClass, setSelectedClass] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [categories, setCategories] = useState<GradeCategory[]>([]);
   const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
   const [saving, setSaving] = useState(false);
@@ -38,6 +39,7 @@ export default function DailyGradeEntry() {
 
   useEffect(() => {
     if (!selectedClass) return;
+    setSelectedCategory("");
     loadData();
   }, [selectedClass]);
 
@@ -110,8 +112,12 @@ export default function DailyGradeEntry() {
     if (!user) return;
     setSaving(true);
 
+    const catsToSave = selectedCategory && selectedCategory !== "all"
+      ? categories.filter((c) => c.id === selectedCategory)
+      : categories;
+
     for (const sg of studentGrades) {
-      for (const cat of categories) {
+      for (const cat of catsToSave) {
         const score = sg.grades[cat.id];
         const existingId = sg.grade_ids[cat.id];
 
@@ -135,21 +141,42 @@ export default function DailyGradeEntry() {
     loadData();
   };
 
+  const visibleCategories = selectedCategory && selectedCategory !== "all"
+    ? categories.filter((c) => c.id === selectedCategory)
+    : categories;
+  
+  const isSingleCategory = selectedCategory && selectedCategory !== "all";
+
   return (
     <Card className="shadow-card">
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <CardTitle className="text-lg">إدخال الدرجات اليومية</CardTitle>
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="اختر الشعبة..." />
-            </SelectTrigger>
-            <SelectContent>
-              {classes.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue placeholder="اختر الشعبة..." />
+              </SelectTrigger>
+              <SelectContent>
+                {classes.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {categories.length > 0 && (
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full sm:w-56">
+                  <SelectValue placeholder="جميع الفئات" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">جميع الفئات</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -163,40 +190,42 @@ export default function DailyGradeEntry() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="text-right sticky right-0 bg-muted/50">#</TableHead>
-                    <TableHead className="text-right sticky right-10 bg-muted/50 min-w-[180px]">الطالب</TableHead>
-                    {categories.map((cat) => (
-                      <TableHead key={cat.id} className="text-center min-w-[100px]">
-                        <div>{cat.name}</div>
-                        <div className="text-xs text-muted-foreground font-normal">
-                          ({Number(cat.weight)}%) من {Number(cat.max_score)}
-                        </div>
-                      </TableHead>
-                    ))}
-                    <TableHead className="text-center min-w-[80px]">المجموع %</TableHead>
+                     <TableHead className="text-right sticky right-0 bg-muted/50">#</TableHead>
+                     <TableHead className="text-right sticky right-10 bg-muted/50 min-w-[180px]">الطالب</TableHead>
+                     {visibleCategories.map((cat) => (
+                       <TableHead key={cat.id} className="text-center min-w-[100px]">
+                         <div>{cat.name}</div>
+                         <div className="text-xs text-muted-foreground font-normal">
+                           ({Number(cat.weight)}%) من {Number(cat.max_score)}
+                         </div>
+                       </TableHead>
+                     ))}
+                     {!isSingleCategory && <TableHead className="text-center min-w-[80px]">المجموع %</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {studentGrades.map((sg, i) => (
                     <TableRow key={sg.student_id}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="font-medium">{sg.full_name}</TableCell>
-                      {categories.map((cat) => (
-                        <TableCell key={cat.id} className="text-center">
-                          <Input
-                            type="number"
-                            min={0}
-                            max={Number(cat.max_score)}
-                            value={sg.grades[cat.id] ?? ""}
-                            onChange={(e) => updateGrade(sg.student_id, cat.id, e.target.value)}
-                            className="w-20 mx-auto text-center h-8"
-                            dir="ltr"
-                          />
-                        </TableCell>
-                      ))}
-                      <TableCell className="text-center font-bold">
-                        {calcTotal(sg.grades)}
-                      </TableCell>
+                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                       <TableCell className="font-medium">{sg.full_name}</TableCell>
+                       {visibleCategories.map((cat) => (
+                         <TableCell key={cat.id} className="text-center">
+                           <Input
+                             type="number"
+                             min={0}
+                             max={Number(cat.max_score)}
+                             value={sg.grades[cat.id] ?? ""}
+                             onChange={(e) => updateGrade(sg.student_id, cat.id, e.target.value)}
+                             className="w-20 mx-auto text-center h-8"
+                             dir="ltr"
+                           />
+                         </TableCell>
+                       ))}
+                       {!isSingleCategory && (
+                         <TableCell className="text-center font-bold">
+                           {calcTotal(sg.grades)}
+                         </TableCell>
+                       )}
                     </TableRow>
                   ))}
                 </TableBody>
