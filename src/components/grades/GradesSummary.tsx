@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Pencil, X } from "lucide-react";
+import { Save, Pencil, X, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ClassInfo {
   id: string;
@@ -42,6 +43,8 @@ export default function GradesSummary() {
   const [editingStudent, setEditingStudent] = useState<string | null>(null);
   const [editedGrades, setEditedGrades] = useState<Record<string, number | null>>({});
   const [saving, setSaving] = useState(false);
+  const [searchName, setSearchName] = useState("");
+  const [filterClass, setFilterClass] = useState("all");
 
   useEffect(() => {
     loadAllData();
@@ -175,11 +178,17 @@ export default function GradesSummary() {
     loadAllData();
   };
 
-  // Group by class
+  // Filter and group by class
+  const filteredRows = summaryRows.filter((r) => {
+    const matchesName = !searchName || r.full_name.includes(searchName);
+    const matchesClass = filterClass === "all" || r.class_id === filterClass;
+    return matchesName && matchesClass;
+  });
+
   const groupedByClass = classes
     .map((cls) => ({
       ...cls,
-      students: summaryRows.filter((r) => r.class_id === cls.id),
+      students: filteredRows.filter((r) => r.class_id === cls.id),
       categories: allCategories.filter((c) => c.class_id === cls.id),
     }))
     .filter((g) => g.students.length > 0);
@@ -193,8 +202,33 @@ export default function GradesSummary() {
   }
 
   return (
-    <div className="space-y-6">
-      {groupedByClass.map((group) => (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="بحث باسم الطالب..."
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            className="pr-9"
+          />
+        </div>
+        <Select value={filterClass} onValueChange={setFilterClass}>
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue placeholder="جميع الشعب" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">جميع الشعب</SelectItem>
+            {classes.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {groupedByClass.length === 0 ? (
+        <p className="text-center py-12 text-muted-foreground">لا توجد نتائج مطابقة</p>
+      ) : groupedByClass.map((group) => (
         <Card key={group.id} className="shadow-card">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
