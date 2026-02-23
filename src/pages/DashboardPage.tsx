@@ -11,6 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import { format } from "date-fns";
+import PeriodComparison from "@/components/dashboard/PeriodComparison";
 
 interface ClassStats {
   name: string;
@@ -296,6 +297,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Weekly & Monthly Comparison */}
+      <PeriodComparison />
     </div>
   );
 }
