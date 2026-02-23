@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CircleCheck, CircleMinus, CircleX, Star, Undo2 } from "lucide-react";
+import { Save, CircleCheck, CircleMinus, CircleX, Star, Undo2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GradeCategory {
@@ -17,22 +17,16 @@ interface GradeCategory {
   max_score: number;
 }
 
+type GradeLevel = "excellent" | "average" | "zero" | null;
+
 interface StudentGrade {
   student_id: string;
   full_name: string;
   grades: Record<string, number | null>;
   grade_ids: Record<string, string>;
+  slots: Record<string, GradeLevel[]>;
+  starred: Record<string, boolean>;
 }
-
-// Grade levels
-type GradeLevel = "excellent" | "average" | "zero" | null;
-
-const getGradeLevel = (score: number | null, maxScore: number): GradeLevel => {
-  if (score === null || score === undefined) return null;
-  if (score >= maxScore) return "excellent";
-  if (score > 0) return "average";
-  return "zero";
-};
 
 const nextLevel = (current: GradeLevel): GradeLevel => {
   if (current === null) return "excellent";
@@ -41,14 +35,13 @@ const nextLevel = (current: GradeLevel): GradeLevel => {
   return null;
 };
 
-const levelToScore = (level: GradeLevel, maxScore: number): number | null => {
-  if (level === "excellent") return maxScore;
-  if (level === "average") return Math.round(maxScore / 2);
-  if (level === "zero") return 0;
-  return null;
+const levelScore = (level: GradeLevel, perSlot: number): number => {
+  if (level === "excellent") return perSlot;
+  if (level === "average") return Math.round(perSlot / 2);
+  return 0;
 };
 
-const LevelIcon = ({ level, size = "h-7 w-7" }: { level: GradeLevel; size?: string }) => {
+const LevelIcon = ({ level, size = "h-6 w-6" }: { level: GradeLevel; size?: string }) => {
   if (level === "excellent") return <CircleCheck className={cn(size, "text-green-600")} />;
   if (level === "average") return <CircleMinus className={cn(size, "text-yellow-500")} />;
   if (level === "zero") return <CircleX className={cn(size, "text-red-500")} />;
@@ -57,9 +50,8 @@ const LevelIcon = ({ level, size = "h-7 w-7" }: { level: GradeLevel; size?: stri
 
 const NUMERIC_CATEGORIES = ["اختبار عملي", "اختبار الفترة"];
 const isNumericCategory = (name: string) => NUMERIC_CATEGORIES.includes(name);
-
-// المشاركة allow 3 additions, others 1
-const getMaxAdditions = (name: string) => name === "المشاركة" ? 3 : 1;
+const isParticipation = (name: string) => name === "المشاركة";
+const MAX_PARTICIPATION_SLOTS = 3;
 
 export default function DailyGradeEntry() {
   const { user } = useAuth();
@@ -83,20 +75,11 @@ export default function DailyGradeEntry() {
 
   const loadData = async () => {
     const { data: cats } = await supabase
-      .from("grade_categories")
-      .select("*")
-      .eq("class_id", selectedClass)
-      .order("sort_order");
-
+      .from("grade_categories").select("*").eq("class_id", selectedClass).order("sort_order");
     const { data: students } = await supabase
-      .from("students")
-      .select("id, full_name")
-      .eq("class_id", selectedClass)
-      .order("full_name");
-
+      .from("students").select("id, full_name").eq("class_id", selectedClass).order("full_name");
     const { data: grades } = await supabase
-      .from("grades")
-      .select("id, student_id, category_id, score")
+      .from("grades").select("id, student_id, category_id, score")
       .in("student_id", (students || []).map((s) => s.id));
 
     const gradesMap = new Map<string, Map<string, { score: number | null; id: string }>>();
@@ -111,25 +94,58 @@ export default function DailyGradeEntry() {
         const studentGradesMap = gradesMap.get(s.id) || new Map();
         const gradeValues: Record<string, number | null> = {};
         const gradeIds: Record<string, string> = {};
+        const slots: Record<string, GradeLevel[]> = {};
+        const starred: Record<string, boolean> = {};
         (cats || []).forEach((c: any) => {
           const g = studentGradesMap.get(c.id);
           gradeValues[c.id] = g?.score ?? null;
           if (g?.id) gradeIds[c.id] = g.id;
+          slots[c.id] = [null]; // start with 1 slot
+          starred[c.id] = false;
         });
-        return { student_id: s.id, full_name: s.full_name, grades: gradeValues, grade_ids: gradeIds };
+        return { student_id: s.id, full_name: s.full_name, grades: gradeValues, grade_ids: gradeIds, slots, starred };
       })
     );
   };
 
-  // Cycle through: null → excellent(green) → average(yellow) → zero(red) → null
-  const cycleGrade = (studentId: string, categoryId: string, maxScore: number) => {
+  const calcSlotsScore = (slotsArr: GradeLevel[], maxScore: number, slotCount: number): number => {
+    const perSlot = Math.round(maxScore / slotCount);
+    return slotsArr.reduce((sum, lvl) => sum + levelScore(lvl, perSlot), 0);
+  };
+
+  const cycleSlot = (studentId: string, categoryId: string, slotIndex: number, maxScore: number, catName: string) => {
+    const maxSlots = isParticipation(catName) ? MAX_PARTICIPATION_SLOTS : 1;
     setStudentGrades((prev) =>
       prev.map((sg) => {
         if (sg.student_id !== studentId) return sg;
-        const current = sg.grades[categoryId];
-        const currentLevel = getGradeLevel(current, maxScore);
-        const next = nextLevel(currentLevel);
-        return { ...sg, grades: { ...sg.grades, [categoryId]: levelToScore(next, maxScore) } };
+        const currentSlots = [...(sg.slots[categoryId] || [null])];
+        currentSlots[slotIndex] = nextLevel(currentSlots[slotIndex]);
+        const score = sg.starred[categoryId] ? maxScore : calcSlotsScore(currentSlots, maxScore, maxSlots);
+        return { ...sg, slots: { ...sg.slots, [categoryId]: currentSlots }, grades: { ...sg.grades, [categoryId]: score } };
+      })
+    );
+  };
+
+  const addSlot = (studentId: string, categoryId: string, maxScore: number) => {
+    setStudentGrades((prev) =>
+      prev.map((sg) => {
+        if (sg.student_id !== studentId) return sg;
+        const currentSlots = [...(sg.slots[categoryId] || [])];
+        if (currentSlots.length >= MAX_PARTICIPATION_SLOTS) return sg;
+        currentSlots.push(null);
+        return { ...sg, slots: { ...sg.slots, [categoryId]: currentSlots } };
+      })
+    );
+  };
+
+  const toggleStar = (studentId: string, categoryId: string, maxScore: number) => {
+    setStudentGrades((prev) =>
+      prev.map((sg) => {
+        if (sg.student_id !== studentId) return sg;
+        const wasStarred = sg.starred[categoryId];
+        const newStarred = !wasStarred;
+        const score = newStarred ? maxScore : calcSlotsScore(sg.slots[categoryId] || [null], maxScore, isParticipation("") ? 1 : 1);
+        return { ...sg, starred: { ...sg.starred, [categoryId]: newStarred }, grades: { ...sg.grades, [categoryId]: score } };
       })
     );
   };
@@ -138,7 +154,7 @@ export default function DailyGradeEntry() {
     setStudentGrades((prev) =>
       prev.map((sg) =>
         sg.student_id === studentId
-          ? { ...sg, grades: { ...sg.grades, [categoryId]: null } }
+          ? { ...sg, grades: { ...sg.grades, [categoryId]: null }, slots: { ...sg.slots, [categoryId]: [null] }, starred: { ...sg.starred, [categoryId]: false } }
           : sg
       )
     );
@@ -148,16 +164,13 @@ export default function DailyGradeEntry() {
     const num = value === "" ? null : Math.min(Math.max(0, Number(value)), maxScore);
     setStudentGrades((prev) =>
       prev.map((sg) =>
-        sg.student_id === studentId
-          ? { ...sg, grades: { ...sg.grades, [categoryId]: num } }
-          : sg
+        sg.student_id === studentId ? { ...sg, grades: { ...sg.grades, [categoryId]: num } } : sg
       )
     );
   };
 
   const calcTotal = (grades: Record<string, number | null>) => {
-    let total = 0;
-    let totalWeight = 0;
+    let total = 0, totalWeight = 0;
     categories.forEach((cat) => {
       const score = grades[cat.id];
       if (score !== null && score !== undefined) {
@@ -172,40 +185,29 @@ export default function DailyGradeEntry() {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-
     const catsToSave = selectedCategory && selectedCategory !== "all"
-      ? categories.filter((c) => c.id === selectedCategory)
-      : categories;
+      ? categories.filter((c) => c.id === selectedCategory) : categories;
 
     for (const sg of studentGrades) {
       for (const cat of catsToSave) {
         const score = sg.grades[cat.id];
         const existingId = sg.grade_ids[cat.id];
-
         if (score !== null && score !== undefined) {
           if (existingId) {
             await supabase.from("grades").update({ score }).eq("id", existingId);
           } else {
-            await supabase.from("grades").insert({
-              student_id: sg.student_id,
-              category_id: cat.id,
-              score,
-              recorded_by: user.id,
-            });
+            await supabase.from("grades").insert({ student_id: sg.student_id, category_id: cat.id, score, recorded_by: user.id });
           }
         }
       }
     }
-
     toast({ title: "تم الحفظ", description: "تم حفظ الدرجات بنجاح" });
     setSaving(false);
     loadData();
   };
 
   const visibleCategories = selectedCategory && selectedCategory !== "all"
-    ? categories.filter((c) => c.id === selectedCategory)
-    : categories;
-
+    ? categories.filter((c) => c.id === selectedCategory) : categories;
   const isSingleCategory = selectedCategory && selectedCategory !== "all";
 
   return (
@@ -215,25 +217,17 @@ export default function DailyGradeEntry() {
           <CardTitle className="text-lg">إدخال الدرجات اليومية</CardTitle>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-full sm:w-56">
-                <SelectValue placeholder="اختر الشعبة..." />
-              </SelectTrigger>
+              <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="اختر الشعبة..." /></SelectTrigger>
               <SelectContent>
-                {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
+                {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
             {categories.length > 0 && (
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full sm:w-56">
-                  <SelectValue placeholder="جميع الفئات" />
-                </SelectTrigger>
+                <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="جميع الفئات" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع الفئات</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
+                  {categories.map((cat) => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
@@ -247,27 +241,21 @@ export default function DailyGradeEntry() {
           <p className="text-center py-12 text-muted-foreground">لم يتم إعداد فئات التقييم لهذه الشعبة بعد</p>
         ) : (
           <>
-            {/* Legend */}
             <div className="flex gap-4 mb-4 text-sm flex-wrap">
               <div className="flex items-center gap-1.5">
-                <CircleCheck className="h-5 w-5 text-green-600" />
-                <span>ممتاز</span>
+                <CircleCheck className="h-5 w-5 text-green-600" /><span>ممتاز</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CircleMinus className="h-5 w-5 text-yellow-500" />
-                <span>متوسط</span>
+                <CircleMinus className="h-5 w-5 text-yellow-500" /><span>متوسط</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CircleX className="h-5 w-5 text-red-500" />
-                <span>صفر</span>
+                <CircleX className="h-5 w-5 text-red-500" /><span>صفر</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Star className="h-5 w-5 text-amber-500" />
-                <span>متميز</span>
+                <Star className="h-5 w-5 text-amber-500 fill-amber-500" /><span>متميز (الدرجة الكاملة)</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Undo2 className="h-4 w-4 text-muted-foreground" />
-                <span>تراجع</span>
+                <Undo2 className="h-4 w-4 text-muted-foreground" /><span>تراجع</span>
               </div>
             </div>
 
@@ -293,70 +281,74 @@ export default function DailyGradeEntry() {
                       {visibleCategories.map((cat) => {
                         const maxScore = Number(cat.max_score);
                         const currentScore = sg.grades[cat.id];
-                        const isNumeric = isNumericCategory(cat.name);
 
-                        if (isNumeric) {
+                        if (isNumericCategory(cat.name)) {
                           return (
                             <TableCell key={cat.id} className="text-center">
-                              <div className="flex items-center justify-center">
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  max={maxScore}
-                                  value={currentScore ?? ""}
-                                  onChange={(e) => setNumericGrade(sg.student_id, cat.id, e.target.value, maxScore)}
-                                  className="w-20 text-center h-8"
-                                  placeholder={`/${maxScore}`}
-                                />
-                              </div>
+                              <Input
+                                type="number" min={0} max={maxScore}
+                                value={currentScore ?? ""}
+                                onChange={(e) => setNumericGrade(sg.student_id, cat.id, e.target.value, maxScore)}
+                                className="w-20 text-center h-8 mx-auto"
+                                placeholder={`/${maxScore}`}
+                              />
                             </TableCell>
                           );
                         }
 
-                        const level = getGradeLevel(currentScore, maxScore);
-                        const starred = currentScore !== null && currentScore >= maxScore && level === "excellent";
+                        const isPartCat = isParticipation(cat.name);
+                        const slotsArr = sg.slots[cat.id] || [null];
+                        const isStarred = sg.starred[cat.id] || false;
 
                         return (
                           <TableCell key={cat.id} className="text-center">
                             <div className="flex items-center justify-center gap-1">
-                              {/* Single cycling icon: click to cycle green→yellow→red→clear */}
-                              <button
-                                type="button"
-                                onClick={() => cycleGrade(sg.student_id, cat.id, maxScore)}
-                                className="p-1 rounded-md transition-all hover:scale-110 cursor-pointer"
-                                title="اضغط للتبديل: ممتاز → متوسط → صفر"
-                              >
-                                <LevelIcon level={level} />
-                              </button>
+                              {/* Cycling icons */}
+                              {slotsArr.map((slotLevel, si) => (
+                                <button
+                                  key={si}
+                                  type="button"
+                                  onClick={() => cycleSlot(sg.student_id, cat.id, si, maxScore, cat.name)}
+                                  className="p-0.5 rounded-md transition-all hover:scale-110 cursor-pointer"
+                                  title="اضغط للتبديل"
+                                >
+                                  <LevelIcon level={slotLevel} />
+                                </button>
+                              ))}
 
-                              {/* Star for excellence */}
+                              {/* Add slot button for participation */}
+                              {isPartCat && slotsArr.length < MAX_PARTICIPATION_SLOTS && (
+                                <button
+                                  type="button"
+                                  onClick={() => addSlot(sg.student_id, cat.id, maxScore)}
+                                  className="p-0.5 rounded-md transition-all hover:scale-110 opacity-40 hover:opacity-80"
+                                  title="إضافة تقييم"
+                                >
+                                  <Plus className="h-5 w-5 text-muted-foreground" />
+                                </button>
+                              )}
+
+                              {/* Separator */}
+                              <span className="w-px h-5 bg-border mx-0.5" />
+
+                              {/* Star - independent */}
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setStudentGrades((prev) =>
-                                    prev.map((s) => {
-                                      if (s.student_id !== sg.student_id) return s;
-                                      const cur = s.grades[cat.id];
-                                      // Toggle star: if already starred remove it, else set max
-                                      const newScore = (cur !== null && cur >= maxScore) ? Math.round(maxScore / 2) : maxScore;
-                                      return { ...s, grades: { ...s.grades, [cat.id]: newScore } };
-                                    })
-                                  );
-                                }}
+                                onClick={() => toggleStar(sg.student_id, cat.id, maxScore)}
                                 className={cn(
-                                  "p-1 rounded-md transition-all hover:scale-110",
-                                  starred ? "opacity-100" : "opacity-40 hover:opacity-70"
+                                  "p-0.5 rounded-md transition-all hover:scale-110",
+                                  isStarred ? "opacity-100" : "opacity-40 hover:opacity-70"
                                 )}
                                 title="متميز"
                               >
-                                <Star className={cn("h-5 w-5", starred ? "text-amber-500 fill-amber-500" : "text-muted-foreground")} />
+                                <Star className={cn("h-5 w-5", isStarred ? "text-amber-500 fill-amber-500" : "text-muted-foreground")} />
                               </button>
 
                               {/* Undo */}
                               <button
                                 type="button"
                                 onClick={() => clearGrade(sg.student_id, cat.id)}
-                                className="p-1 rounded-md transition-all hover:scale-110 opacity-40 hover:opacity-100"
+                                className="p-0.5 rounded-md transition-all hover:scale-110 opacity-40 hover:opacity-100"
                                 title="تراجع"
                               >
                                 <Undo2 className="h-4 w-4 text-muted-foreground" />
@@ -366,9 +358,7 @@ export default function DailyGradeEntry() {
                         );
                       })}
                       {!isSingleCategory && (
-                        <TableCell className="text-center font-bold">
-                          {calcTotal(sg.grades)}
-                        </TableCell>
+                        <TableCell className="text-center font-bold">{calcTotal(sg.grades)}</TableCell>
                       )}
                     </TableRow>
                   ))}
