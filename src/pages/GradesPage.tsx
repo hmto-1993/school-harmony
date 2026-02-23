@@ -40,7 +40,7 @@ export default function GradesPage() {
         </TabsContent>
 
         <TabsContent value="summary">
-          <GradesSummary />
+          <GradesSummary selectedClass={selectedClass} onClassChange={setSelectedClass} />
         </TabsContent>
       </Tabs>
     </div>

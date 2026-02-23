@@ -33,7 +33,12 @@ interface SummaryRow {
   total: string;
 }
 
-export default function GradesSummary() {
+interface GradesSummaryProps {
+  selectedClass: string;
+  onClassChange: (classId: string) => void;
+}
+
+export default function GradesSummary({ selectedClass, onClassChange }: GradesSummaryProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -44,7 +49,6 @@ export default function GradesSummary() {
   const [editedGrades, setEditedGrades] = useState<Record<string, number | null>>({});
   const [saving, setSaving] = useState(false);
   const [searchName, setSearchName] = useState("");
-  const [filterClass, setFilterClass] = useState("all");
 
   useEffect(() => {
     loadAllData();
@@ -181,7 +185,7 @@ export default function GradesSummary() {
   // Filter and group by class
   const filteredRows = summaryRows.filter((r) => {
     const matchesName = !searchName || r.full_name.includes(searchName);
-    const matchesClass = filterClass === "all" || r.class_id === filterClass;
+    const matchesClass = !selectedClass || selectedClass === "all" || r.class_id === selectedClass;
     return matchesName && matchesClass;
   });
 
@@ -213,7 +217,7 @@ export default function GradesSummary() {
             className="pr-9"
           />
         </div>
-        <Select value={filterClass} onValueChange={setFilterClass}>
+        <Select value={selectedClass || "all"} onValueChange={(v) => onClassChange(v === "all" ? "" : v)}>
           <SelectTrigger className="w-full sm:w-56">
             <SelectValue placeholder="جميع الشعب" />
           </SelectTrigger>
