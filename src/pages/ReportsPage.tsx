@@ -510,7 +510,7 @@ export default function ReportsPage() {
           </div>
 
           {attendanceData.length > 0 && (
-            <>
+            <div className="print-area space-y-4">
               {/* Summary Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card>
@@ -583,7 +583,7 @@ export default function ReportsPage() {
                   </div>
                 </CardContent>
               </Card>
-            </>
+            </div>
           )}
 
           {!loadingAttendance && attendanceData.length === 0 && (
@@ -618,7 +618,7 @@ export default function ReportsPage() {
           </div>
 
           {gradeData.length > 0 && (
-            <>
+            <div className="print-area space-y-4">
               {/* Grades Chart */}
               <GradesChart data={gradeData} categoryNames={categoryNames} />
 
@@ -654,7 +654,7 @@ export default function ReportsPage() {
                 </div>
               </CardContent>
             </Card>
-            </>
+            </div>
           )}
 
           {!loadingGrades && gradeData.length === 0 && (

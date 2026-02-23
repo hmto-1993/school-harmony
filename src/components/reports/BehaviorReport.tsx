@@ -144,7 +144,7 @@ export default function BehaviorReport({ selectedClass, dateFrom, dateTo, select
           <BarChart3 className="h-4 w-4 ml-1.5" />
           {loading ? "جارٍ التحميل..." : "عرض التقرير"}
         </Button>
-        {data.length > 0 && (
+      {data.length > 0 && (
           <>
             <Button variant="outline" size="sm" onClick={exportExcel} className="gap-1.5">
               <FileSpreadsheet className="h-4 w-4" /> Excel
@@ -157,7 +157,7 @@ export default function BehaviorReport({ selectedClass, dateFrom, dateTo, select
       </div>
 
       {data.length > 0 && (
-        <>
+        <div className="print-area space-y-4">
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card>
@@ -282,7 +282,7 @@ export default function BehaviorReport({ selectedClass, dateFrom, dateTo, select
               </div>
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
 
       {!loading && data.length === 0 && (
