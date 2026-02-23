@@ -103,6 +103,12 @@ export default function SettingsPage() {
   const [letterheadUrl, setLetterheadUrl] = useState("");
   const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
 
+  // Change own password
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newOwnPassword, setNewOwnPassword] = useState("");
+  const [confirmOwnPassword, setConfirmOwnPassword] = useState("");
+  const [changingOwnPassword, setChangingOwnPassword] = useState(false);
+
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [categories, setCategories] = useState<GradeCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,6 +214,34 @@ export default function SettingsPage() {
       toast({ title: "خطأ", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "تم الحفظ", description: "تم تحديث الملف الشخصي بنجاح" });
+    }
+  };
+
+  const handleChangeOwnPassword = async () => {
+    if (!newOwnPassword.trim() || !currentPassword.trim()) return;
+    if (newOwnPassword !== confirmOwnPassword) {
+      toast({ title: "خطأ", description: "كلمة المرور الجديدة غير متطابقة", variant: "destructive" });
+      return;
+    }
+    setChangingOwnPassword(true);
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user?.email || "",
+      password: currentPassword,
+    });
+    if (signInError) {
+      toast({ title: "خطأ", description: "كلمة المرور الحالية غير صحيحة", variant: "destructive" });
+      setChangingOwnPassword(false);
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newOwnPassword });
+    setChangingOwnPassword(false);
+    if (error) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تم التغيير", description: "تم تغيير كلمة المرور بنجاح" });
+      setCurrentPassword("");
+      setNewOwnPassword("");
+      setConfirmOwnPassword("");
     }
   };
 
@@ -780,6 +814,48 @@ export default function SettingsPage() {
                 <Save className="h-4 w-4" />
                 {savingProfile ? "جارٍ الحفظ..." : "حفظ التغييرات"}
               </Button>
+
+              <div className="border-t pt-4 mt-4 space-y-4">
+                <h3 className="text-base font-semibold">تغيير كلمة المرور</h3>
+                <div className="space-y-2">
+                  <Label>كلمة المرور الحالية</Label>
+                  <Input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="أدخل كلمة المرور الحالية"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>كلمة المرور الجديدة</Label>
+                  <Input
+                    type="password"
+                    value={newOwnPassword}
+                    onChange={(e) => setNewOwnPassword(e.target.value)}
+                    placeholder="أدخل كلمة المرور الجديدة"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>تأكيد كلمة المرور الجديدة</Label>
+                  <Input
+                    type="password"
+                    value={confirmOwnPassword}
+                    onChange={(e) => setConfirmOwnPassword(e.target.value)}
+                    placeholder="أعد إدخال كلمة المرور الجديدة"
+                    dir="ltr"
+                  />
+                </div>
+                <Button
+                  onClick={handleChangeOwnPassword}
+                  disabled={changingOwnPassword || !currentPassword.trim() || !newOwnPassword.trim() || !confirmOwnPassword.trim()}
+                  className="gap-1.5"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  {changingOwnPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
