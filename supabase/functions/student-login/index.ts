@@ -1,0 +1,95 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const { national_id, academic_number } = await req.json();
+
+    if (!national_id || !academic_number) {
+      return new Response(
+        JSON.stringify({ error: "رقم الهوية والرقم الأكاديمي مطلوبان" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Verify student credentials
+    const { data: student, error } = await supabase
+      .from("students")
+      .select("id, full_name, class_id, national_id, academic_number, parent_phone")
+      .eq("national_id", national_id)
+      .eq("academic_number", academic_number)
+      .single();
+
+    if (error || !student) {
+      return new Response(
+        JSON.stringify({ error: "رقم الهوية أو الرقم الأكاديمي غير صحيح" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch student's class info
+    let className = null;
+    if (student.class_id) {
+      const { data: cls } = await supabase
+        .from("classes")
+        .select("name, grade, section")
+        .eq("id", student.class_id)
+        .single();
+      className = cls;
+    }
+
+    // Fetch grades with categories
+    const { data: grades } = await supabase
+      .from("grades")
+      .select("score, category_id, grade_categories(name, max_score, weight)")
+      .eq("student_id", student.id);
+
+    // Fetch behavior records
+    const { data: behaviors } = await supabase
+      .from("behavior_records")
+      .select("type, note, date")
+      .eq("student_id", student.id)
+      .order("date", { ascending: false })
+      .limit(20);
+
+    // Fetch attendance
+    const { data: attendance } = await supabase
+      .from("attendance_records")
+      .select("status, date, notes")
+      .eq("student_id", student.id)
+      .order("date", { ascending: false })
+      .limit(30);
+
+    return new Response(
+      JSON.stringify({
+        student: {
+          id: student.id,
+          full_name: student.full_name,
+          national_id: student.national_id,
+          class: className,
+        },
+        grades: grades || [],
+        behaviors: behaviors || [],
+        attendance: attendance || [],
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "حدث خطأ غير متوقع" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

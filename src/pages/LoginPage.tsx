@@ -5,20 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import schoolLogo from "@/assets/school-logo.jpg";
 import loginBg from "@/assets/login-bg.jpg";
+import { GraduationCap, Shield } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [nationalId, setNationalId] = useState("");
   const [password, setPassword] = useState("");
+  const [studentNationalId, setStudentNationalId] = useState("");
+  const [academicNumber, setAcademicNumber] = useState("");
   const [loading, setLoading] = useState(false);
-  const [remember, setRemember] = useState(false);
   const [schoolName, setSchoolName] = useState("ثانوية الفيصلية");
   const [schoolSubtitle, setSchoolSubtitle] = useState("نظام إدارة المدرسة");
-  const { signIn } = useAuth();
+  const { signIn, signInStudent, user, isStudent } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -31,22 +33,66 @@ export default function LoginPage() {
     });
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user) navigate("/dashboard", { replace: true });
+    if (isStudent) navigate("/student", { replace: true });
+  }, [user, isStudent, navigate]);
+
+  const handleStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+    if (!nationalId.trim() || !password.trim()) return;
 
     setLoading(true);
-    const { error } = await signIn(email, password);
+    try {
+      // Look up email by national_id
+      const { data, error: lookupError } = await supabase.functions.invoke("lookup-staff-email", {
+        body: { national_id: nationalId },
+      });
+
+      if (lookupError || data?.error) {
+        toast({
+          title: "خطأ في تسجيل الدخول",
+          description: data?.error || "رقم الهوية غير مسجل",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await signIn(data.email, password);
+      if (error) {
+        toast({
+          title: "خطأ في تسجيل الدخول",
+          description: "رقم الهوية أو كلمة المرور غير صحيحة",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ في الاتصال",
+        variant: "destructive",
+      });
+    }
+    setLoading(false);
+  };
+
+  const handleStudentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentNationalId.trim() || !academicNumber.trim()) return;
+
+    setLoading(true);
+    const { error } = await signInStudent(studentNationalId, academicNumber);
     setLoading(false);
 
     if (error) {
       toast({
         title: "خطأ في تسجيل الدخول",
-        description: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+        description: error,
         variant: "destructive",
       });
     } else {
-      navigate("/dashboard");
+      navigate("/student");
     }
   };
 
@@ -59,57 +105,95 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-md animate-fade-in">
         <Card className="shadow-card border-border/50 bg-background/90 backdrop-blur-sm">
           <CardHeader className="flex flex-col items-center gap-4 pb-2">
-            <img
-              src={schoolLogo}
-              alt="شعار المدرسة"
-              className="h-24 w-auto"
-            />
+            <img src={schoolLogo} alt="شعار المدرسة" className="h-24 w-auto" />
             <div className="text-center">
               <h1 className="text-2xl font-bold text-foreground">{schoolName}</h1>
               <p className="mt-1 text-sm text-muted-foreground">{schoolSubtitle}</p>
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">البريد الإلكتروني</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="example@school.edu.sa"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="text-right"
-                  dir="ltr"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">كلمة المرور</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  dir="ltr"
-                  required
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="remember"
-                  checked={remember}
-                  onCheckedChange={(c) => setRemember(c === true)}
-                />
-                <Label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer">
-                  تذكرني
-                </Label>
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "جارٍ الدخول..." : "تسجيل الدخول"}
-              </Button>
-            </form>
+            <Tabs defaultValue="staff" dir="rtl">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="staff" className="gap-2">
+                  <Shield className="h-4 w-4" />
+                  معلم / مدير
+                </TabsTrigger>
+                <TabsTrigger value="student" className="gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  طالب
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="staff">
+                <form onSubmit={handleStaffSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="staff-id">رقم الهوية الوطنية</Label>
+                    <Input
+                      id="staff-id"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="1234567890"
+                      value={nationalId}
+                      onChange={(e) => setNationalId(e.target.value)}
+                      dir="ltr"
+                      className="text-right"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staff-password">كلمة المرور</Label>
+                    <Input
+                      id="staff-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      dir="ltr"
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "جارٍ الدخول..." : "تسجيل الدخول"}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="student">
+                <form onSubmit={handleStudentSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="student-id">رقم الهوية الوطنية</Label>
+                    <Input
+                      id="student-id"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="1234567890"
+                      value={studentNationalId}
+                      onChange={(e) => setStudentNationalId(e.target.value)}
+                      dir="ltr"
+                      className="text-right"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="academic-number">الرقم الأكاديمي</Label>
+                    <Input
+                      id="academic-number"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="الرقم الأكاديمي"
+                      value={academicNumber}
+                      onChange={(e) => setAcademicNumber(e.target.value)}
+                      dir="ltr"
+                      className="text-right"
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "جارٍ الدخول..." : "دخول الطالب"}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>

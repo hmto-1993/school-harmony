@@ -14,6 +14,7 @@ import GradesPage from "@/pages/GradesPage";
 import ReportsPage from "@/pages/ReportsPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import StudentDashboard from "@/pages/StudentDashboard";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/student" element={<StudentDashboard />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route
               element={
