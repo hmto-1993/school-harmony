@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CircleCheck, Star, Undo2 } from "lucide-react";
+import { Save, CircleCheck, CircleMinus, CircleX, Star, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GradeCategory {
@@ -24,24 +24,42 @@ interface StudentGrade {
   grade_ids: Record<string, string>;
 }
 
-// Categories that use numeric input instead of icons
+// Grade levels
+type GradeLevel = "excellent" | "average" | "zero" | null;
+
+const getGradeLevel = (score: number | null, maxScore: number): GradeLevel => {
+  if (score === null || score === undefined) return null;
+  if (score >= maxScore) return "excellent";
+  if (score > 0) return "average";
+  return "zero";
+};
+
+const nextLevel = (current: GradeLevel): GradeLevel => {
+  if (current === null) return "excellent";
+  if (current === "excellent") return "average";
+  if (current === "average") return "zero";
+  return null;
+};
+
+const levelToScore = (level: GradeLevel, maxScore: number): number | null => {
+  if (level === "excellent") return maxScore;
+  if (level === "average") return Math.round(maxScore / 2);
+  if (level === "zero") return 0;
+  return null;
+};
+
+const LevelIcon = ({ level, size = "h-7 w-7" }: { level: GradeLevel; size?: string }) => {
+  if (level === "excellent") return <CircleCheck className={cn(size, "text-green-600")} />;
+  if (level === "average") return <CircleMinus className={cn(size, "text-yellow-500")} />;
+  if (level === "zero") return <CircleX className={cn(size, "text-red-500")} />;
+  return <CircleMinus className={cn(size, "text-muted-foreground opacity-30")} />;
+};
+
 const NUMERIC_CATEGORIES = ["اختبار عملي", "اختبار الفترة"];
 const isNumericCategory = (name: string) => NUMERIC_CATEGORIES.includes(name);
 
-// Config for icon-based categories: max clicks and increment per click
-const getCategoryConfig = (name: string, maxScore: number) => {
-  if (name === "المشاركة") return { maxClicks: 3, increment: Math.round(maxScore / 4) };
-  return { maxClicks: 1, increment: Math.round(maxScore / 2) };
-};
-
-const getClickCount = (score: number | null, increment: number): number => {
-  if (!score || score <= 0 || increment <= 0) return 0;
-  return Math.min(Math.floor(score / increment), 10);
-};
-
-const isStarred = (score: number | null, maxScore: number): boolean => {
-  return score !== null && score >= maxScore;
-};
+// المشاركة allow 3 additions, others 1
+const getMaxAdditions = (name: string) => name === "المشاركة" ? 3 : 1;
 
 export default function DailyGradeEntry() {
   const { user } = useAuth();
@@ -103,32 +121,15 @@ export default function DailyGradeEntry() {
     );
   };
 
-  const addClick = (studentId: string, categoryId: string, catName: string, maxScore: number) => {
-    const config = getCategoryConfig(catName, maxScore);
+  // Cycle through: null → excellent(green) → average(yellow) → zero(red) → null
+  const cycleGrade = (studentId: string, categoryId: string, maxScore: number) => {
     setStudentGrades((prev) =>
       prev.map((sg) => {
         if (sg.student_id !== studentId) return sg;
-        const current = sg.grades[categoryId] ?? 0;
-        const currentClicks = getClickCount(current, config.increment);
-        if (currentClicks >= config.maxClicks) return sg;
-        const starred = isStarred(current, maxScore);
-        const newScore = Math.min((currentClicks + 1) * config.increment, starred ? maxScore : maxScore);
-        return { ...sg, grades: { ...sg.grades, [categoryId]: newScore } };
-      })
-    );
-  };
-
-  const toggleStar = (studentId: string, categoryId: string, catName: string, maxScore: number) => {
-    setStudentGrades((prev) =>
-      prev.map((sg) => {
-        if (sg.student_id !== studentId) return sg;
-        const current = sg.grades[categoryId] ?? 0;
-        if (isStarred(current, maxScore)) {
-          // Remove star: go back to max clicks score
-          const config = getCategoryConfig(catName, maxScore);
-          return { ...sg, grades: { ...sg.grades, [categoryId]: config.maxClicks * config.increment } };
-        }
-        return { ...sg, grades: { ...sg.grades, [categoryId]: maxScore } };
+        const current = sg.grades[categoryId];
+        const currentLevel = getGradeLevel(current, maxScore);
+        const next = nextLevel(currentLevel);
+        return { ...sg, grades: { ...sg.grades, [categoryId]: levelToScore(next, maxScore) } };
       })
     );
   };
@@ -249,12 +250,20 @@ export default function DailyGradeEntry() {
             {/* Legend */}
             <div className="flex gap-4 mb-4 text-sm flex-wrap">
               <div className="flex items-center gap-1.5">
-                <CircleCheck className="h-5 w-5 text-primary" />
-                <span>إضافة نقطة</span>
+                <CircleCheck className="h-5 w-5 text-green-600" />
+                <span>ممتاز</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CircleMinus className="h-5 w-5 text-yellow-500" />
+                <span>متوسط</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CircleX className="h-5 w-5 text-red-500" />
+                <span>صفر</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Star className="h-5 w-5 text-amber-500" />
-                <span>نجمة التميز (الدرجة الكاملة)</span>
+                <span>متميز</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Undo2 className="h-4 w-4 text-muted-foreground" />
@@ -269,7 +278,7 @@ export default function DailyGradeEntry() {
                     <TableHead className="text-right sticky right-0 bg-muted/50">#</TableHead>
                     <TableHead className="text-right sticky right-10 bg-muted/50 min-w-[180px]">الطالب</TableHead>
                     {visibleCategories.map((cat) => (
-                      <TableHead key={cat.id} className="text-center min-w-[140px]">
+                      <TableHead key={cat.id} className="text-center min-w-[100px]">
                         <div>{cat.name}</div>
                       </TableHead>
                     ))}
@@ -289,7 +298,7 @@ export default function DailyGradeEntry() {
                         if (isNumeric) {
                           return (
                             <TableCell key={cat.id} className="text-center">
-                              <div className="flex items-center justify-center gap-2">
+                              <div className="flex items-center justify-center">
                                 <Input
                                   type="number"
                                   min={0}
@@ -304,43 +313,43 @@ export default function DailyGradeEntry() {
                           );
                         }
 
-                        const config = getCategoryConfig(cat.name, maxScore);
-                        const clicks = getClickCount(currentScore, config.increment);
-                        const starred = isStarred(currentScore, maxScore);
+                        const level = getGradeLevel(currentScore, maxScore);
+                        const starred = currentScore !== null && currentScore >= maxScore && level === "excellent";
 
                         return (
                           <TableCell key={cat.id} className="text-center">
                             <div className="flex items-center justify-center gap-1">
-                              {/* Main click icon with count */}
+                              {/* Single cycling icon: click to cycle green→yellow→red→clear */}
                               <button
                                 type="button"
-                                onClick={() => addClick(sg.student_id, cat.id, cat.name, maxScore)}
-                                className={cn(
-                                  "p-1 rounded-md transition-all hover:scale-110 relative",
-                                  clicks > 0 ? "opacity-100" : "opacity-40 hover:opacity-70"
-                                )}
-                                title={`إضافة نقطة (${clicks}/${config.maxClicks})`}
-                                disabled={clicks >= config.maxClicks}
+                                onClick={() => cycleGrade(sg.student_id, cat.id, maxScore)}
+                                className="p-1 rounded-md transition-all hover:scale-110 cursor-pointer"
+                                title="اضغط للتبديل: ممتاز → متوسط → صفر"
                               >
-                                <CircleCheck className={cn("h-6 w-6", clicks > 0 ? "text-primary" : "text-muted-foreground")} />
-                                {clicks > 0 && (
-                                  <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                                    {clicks}
-                                  </span>
-                                )}
+                                <LevelIcon level={level} />
                               </button>
 
                               {/* Star for excellence */}
                               <button
                                 type="button"
-                                onClick={() => toggleStar(sg.student_id, cat.id, cat.name, maxScore)}
+                                onClick={() => {
+                                  setStudentGrades((prev) =>
+                                    prev.map((s) => {
+                                      if (s.student_id !== sg.student_id) return s;
+                                      const cur = s.grades[cat.id];
+                                      // Toggle star: if already starred remove it, else set max
+                                      const newScore = (cur !== null && cur >= maxScore) ? Math.round(maxScore / 2) : maxScore;
+                                      return { ...s, grades: { ...s.grades, [cat.id]: newScore } };
+                                    })
+                                  );
+                                }}
                                 className={cn(
                                   "p-1 rounded-md transition-all hover:scale-110",
                                   starred ? "opacity-100" : "opacity-40 hover:opacity-70"
                                 )}
-                                title="نجمة التميز"
+                                title="متميز"
                               >
-                                <Star className={cn("h-6 w-6", starred ? "text-amber-500 fill-amber-500" : "text-muted-foreground")} />
+                                <Star className={cn("h-5 w-5", starred ? "text-amber-500 fill-amber-500" : "text-muted-foreground")} />
                               </button>
 
                               {/* Undo */}
@@ -352,15 +361,6 @@ export default function DailyGradeEntry() {
                               >
                                 <Undo2 className="h-4 w-4 text-muted-foreground" />
                               </button>
-
-                              {/* Score display */}
-                              <span className={cn(
-                                "mr-1 text-sm font-semibold min-w-[28px]",
-                                starred ? "text-amber-600" :
-                                clicks > 0 ? "text-primary" : "text-muted-foreground"
-                              )}>
-                                {currentScore !== null && currentScore !== undefined ? currentScore : "—"}
-                              </span>
                             </div>
                           </TableCell>
                         );
