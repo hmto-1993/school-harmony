@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,16 +7,29 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import schoolLogo from "@/assets/school-logo.jpg";
+import loginBg from "@/assets/login-bg.jpg";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [schoolName, setSchoolName] = useState("ثانوية الفيصلية");
+  const [schoolSubtitle, setSchoolSubtitle] = useState("نظام إدارة المدرسة");
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.from("site_settings").select("id, value").then(({ data }) => {
+      data?.forEach((row) => {
+        if (row.id === "school_name") setSchoolName(row.value);
+        if (row.id === "school_subtitle") setSchoolSubtitle(row.value);
+      });
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,18 +51,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md animate-fade-in">
-        <Card className="shadow-card border-border/50">
+    <div className="relative flex min-h-screen items-center justify-center px-4">
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${loginBg})`, filter: "brightness(0.35)" }}
+      />
+      <div className="relative z-10 w-full max-w-md animate-fade-in">
+        <Card className="shadow-card border-border/50 bg-background/90 backdrop-blur-sm">
           <CardHeader className="flex flex-col items-center gap-4 pb-2">
             <img
               src={schoolLogo}
-              alt="شعار ثانوية الفيصلية"
+              alt="شعار المدرسة"
               className="h-24 w-auto"
             />
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-foreground">ثانوية الفيصلية</h1>
-              <p className="mt-1 text-sm text-muted-foreground">نظام إدارة المدرسة</p>
+              <h1 className="text-2xl font-bold text-foreground">{schoolName}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{schoolSubtitle}</p>
             </div>
           </CardHeader>
           <CardContent>
