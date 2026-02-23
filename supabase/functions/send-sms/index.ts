@@ -12,32 +12,141 @@ interface SMSRequest {
   message: string;
 }
 
+function formatPhone(phone: string): string {
+  let formatted = phone.replace(/[\s\-\+]/g, "");
+  if (formatted.startsWith("0")) {
+    formatted = "966" + formatted.slice(1);
+  }
+  if (!formatted.startsWith("966")) {
+    formatted = "966" + formatted;
+  }
+  return formatted;
+}
+
+async function sendViaMsegat(phone: string, message: string, settings: Record<string, string>) {
+  const username = settings["sms_provider_username"] || Deno.env.get("MSEGAT_USERNAME");
+  const apiKey = settings["sms_provider_api_key"] || Deno.env.get("MSEGAT_API_KEY");
+  const sender = settings["sms_provider_sender"] || Deno.env.get("MSEGAT_SENDER_NAME");
+
+  if (!username || !apiKey || !sender) {
+    throw new Error("بيانات MSEGAT غير مكتملة");
+  }
+
+  const response = await fetch("https://www.msegat.com/gw/sendsms.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userName: username,
+      apiKey: apiKey,
+      numbers: formatPhone(phone),
+      userSender: sender,
+      msg: message,
+      msgEncoding: "UTF8",
+    }),
+  });
+
+  const result = await response.json();
+  console.log("MSEGAT response:", JSON.stringify(result));
+
+  if (result.code === "1" || result.code === 1) {
+    return { success: true, message: "تم إرسال الرسالة بنجاح", result };
+  } else {
+    return { success: false, error: result.message || "فشل إرسال الرسالة", result };
+  }
+}
+
+async function sendViaUnifonic(phone: string, message: string, settings: Record<string, string>) {
+  const appSid = settings["sms_provider_api_key"];
+  const sender = settings["sms_provider_sender"];
+
+  if (!appSid) {
+    throw new Error("بيانات Unifonic غير مكتملة (App SID مطلوب)");
+  }
+
+  const formattedPhone = formatPhone(phone);
+
+  const params = new URLSearchParams({
+    AppSid: appSid,
+    Recipient: formattedPhone,
+    Body: message,
+    ...(sender ? { SenderID: sender } : {}),
+  });
+
+  const response = await fetch("https://el.cloud.unifonic.com/rest/SMS/messages/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+
+  const result = await response.json();
+  console.log("Unifonic response:", JSON.stringify(result));
+
+  if (result.success === true || result.Success === "true" || result.errorCode === "ER-00") {
+    return { success: true, message: "تم إرسال الرسالة بنجاح", result };
+  } else {
+    return { success: false, error: result.message || result.Message || "فشل إرسال الرسالة", result };
+  }
+}
+
+async function sendViaTaqnyat(phone: string, message: string, settings: Record<string, string>) {
+  const bearer = settings["sms_provider_api_key"];
+  const sender = settings["sms_provider_sender"];
+
+  if (!bearer || !sender) {
+    throw new Error("بيانات Taqnyat غير مكتملة");
+  }
+
+  const formattedPhone = formatPhone(phone);
+
+  const response = await fetch("https://api.taqnyat.sa/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${bearer}`,
+    },
+    body: JSON.stringify({
+      recipients: [formattedPhone],
+      body: message,
+      sender: sender,
+    }),
+  });
+
+  const result = await response.json();
+  console.log("Taqnyat response:", JSON.stringify(result));
+
+  if (result.statusCode === 201 || result.statusCode === 200) {
+    return { success: true, message: "تم إرسال الرسالة بنجاح", result };
+  } else {
+    return { success: false, error: result.message || "فشل إرسال الرسالة", result };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Try reading provider settings from site_settings first
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const { data: settings } = await supabase
+    const { data: settingsData } = await supabase
       .from("site_settings")
       .select("id, value")
-      .in("id", ["sms_provider_username", "sms_provider_api_key", "sms_provider_sender"]);
+      .in("id", [
+        "sms_provider",
+        "sms_provider_username",
+        "sms_provider_api_key",
+        "sms_provider_sender",
+      ]);
 
-    const settingsMap: Record<string, string> = {};
-    (settings || []).forEach((s: any) => { settingsMap[s.id] = s.value; });
+    const settings: Record<string, string> = {};
+    (settingsData || []).forEach((s: any) => {
+      settings[s.id] = s.value;
+    });
 
-    const username = settingsMap["sms_provider_username"] || Deno.env.get("MSEGAT_USERNAME");
-    const apiKey = settingsMap["sms_provider_api_key"] || Deno.env.get("MSEGAT_API_KEY");
-    const sender = settingsMap["sms_provider_sender"] || Deno.env.get("MSEGAT_SENDER_NAME");
-
-    if (!username || !apiKey || !sender) {
-      throw new Error("MSEGAT credentials not configured");
-    }
+    const provider = settings["sms_provider"] || "msegat";
 
     const { phone, message } = (await req.json()) as SMSRequest;
 
@@ -48,42 +157,25 @@ serve(async (req) => {
       );
     }
 
-    // Format phone: ensure it starts with 966
-    let formattedPhone = phone.replace(/[\s\-\+]/g, "");
-    if (formattedPhone.startsWith("0")) {
-      formattedPhone = "966" + formattedPhone.slice(1);
-    }
-    if (!formattedPhone.startsWith("966")) {
-      formattedPhone = "966" + formattedPhone;
+    let result;
+    switch (provider) {
+      case "unifonic":
+        result = await sendViaUnifonic(phone, message, settings);
+        break;
+      case "taqnyat":
+        result = await sendViaTaqnyat(phone, message, settings);
+        break;
+      case "msegat":
+      default:
+        result = await sendViaMsegat(phone, message, settings);
+        break;
     }
 
-    const response = await fetch("https://www.msegat.com/gw/sendsms.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userName: username,
-        apiKey: apiKey,
-        numbers: formattedPhone,
-        userSender: sender,
-        msg: message,
-        msgEncoding: "UTF8",
-      }),
+    const status = result.success ? 200 : 400;
+    return new Response(JSON.stringify(result), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
-    const result = await response.json();
-    console.log("MSEGAT response:", JSON.stringify(result));
-
-    if (result.code === "1" || result.code === 1) {
-      return new Response(
-        JSON.stringify({ success: true, message: "تم إرسال الرسالة بنجاح", result }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    } else {
-      return new Response(
-        JSON.stringify({ success: false, error: result.message || "فشل إرسال الرسالة", result }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
   } catch (error) {
     console.error("SMS Error:", error.message);
     return new Response(
