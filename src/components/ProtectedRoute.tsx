@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, isStudent } = useAuth();
 
   if (loading) {
     return (
@@ -19,6 +19,9 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
       </div>
     );
   }
+
+  // If student is logged in, redirect to student dashboard
+  if (isStudent) return <Navigate to="/student" replace />;
 
   if (!user) return <Navigate to="/login" replace />;
 
