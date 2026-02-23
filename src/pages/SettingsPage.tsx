@@ -24,6 +24,8 @@ import {
   Eye,
   UserCircle,
   KeyRound,
+  Printer,
+  Upload,
 } from "lucide-react";
 import {
   Dialog,
@@ -96,6 +98,10 @@ export default function SettingsPage() {
   const [newTeacherPassword, setNewTeacherPassword] = useState("");
   const [newTeacherNationalId, setNewTeacherNationalId] = useState("");
   const [creatingTeacher, setCreatingTeacher] = useState(false);
+
+  // Letterhead
+  const [letterheadUrl, setLetterheadUrl] = useState("");
+  const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [categories, setCategories] = useState<GradeCategory[]>([]);
@@ -170,6 +176,14 @@ export default function SettingsPage() {
         setTeachers(teachersData.teachers);
       }
     }
+
+    // Fetch letterhead URL
+    const { data: lhSetting } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("id", "print_letterhead_url")
+      .single();
+    if (lhSetting?.value) setLetterheadUrl(lhSetting.value);
 
     setLoading(false);
   };
@@ -251,6 +265,27 @@ export default function SettingsPage() {
     setNewTeacherNationalId("");
     setCreatingTeacher(false);
     fetchData();
+  };
+
+  const handleUploadLetterhead = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLetterhead(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const { data, error } = await supabase.functions.invoke("upload-letterhead", {
+      body: formData,
+    });
+
+    setUploadingLetterhead(false);
+    if (error || data?.error) {
+      toast({ title: "خطأ", description: data?.error || "فشل رفع الملف", variant: "destructive" });
+    } else {
+      setLetterheadUrl(data.url);
+      toast({ title: "تم الرفع", description: "تم تحديث ورقة الطباعة بنجاح" });
+    }
   };
 
   const handleAddClass = async () => {
@@ -388,6 +423,10 @@ export default function SettingsPage() {
               <TabsTrigger value="new-teacher" className="gap-1.5">
                 <Plus className="h-4 w-4" />
                 إضافة معلم
+              </TabsTrigger>
+              <TabsTrigger value="letterhead" className="gap-1.5">
+                <Printer className="h-4 w-4" />
+                ورقة الطباعة
               </TabsTrigger>
             </>
           )}
@@ -844,6 +883,45 @@ export default function SettingsPage() {
                     <Plus className="h-4 w-4" />
                     {creatingTeacher ? "جارٍ الإنشاء..." : "إنشاء الحساب"}
                   </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="letterhead">
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="text-lg">ورقة الطباعة للتقارير</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 max-w-lg">
+                  <p className="text-sm text-muted-foreground">
+                    ارفع صورة ترويسة (شعار + بيانات المدرسة) لاستخدامها في طباعة التقارير
+                  </p>
+                  {letterheadUrl && (
+                    <div className="rounded-lg border p-2">
+                      <img
+                        src={letterheadUrl}
+                        alt="ورقة الطباعة الحالية"
+                        className="w-full max-h-48 object-contain"
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={uploadingLetterhead}
+                      onClick={() => document.getElementById("letterhead-input")?.click()}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {uploadingLetterhead ? "جارٍ الرفع..." : letterheadUrl ? "تغيير الصورة" : "رفع صورة"}
+                    </Button>
+                    <input
+                      id="letterhead-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleUploadLetterhead}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
