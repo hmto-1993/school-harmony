@@ -1,0 +1,1 @@
+INSERT INTO public.site_settings (id, value) VALUES ('sms_provider', 'msegat') ON CONFLICT (id) DO NOTHING;

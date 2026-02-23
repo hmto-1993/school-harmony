@@ -87,6 +87,7 @@ export default function NotificationsPage() {
   const [smsLog, setSmsLog] = useState<{ name: string; phone: string; success: boolean; error?: string }[]>([]);
 
   // SMS Provider settings
+  const [smsProvider, setSmsProvider] = useState("msegat");
   const [providerUsername, setProviderUsername] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
   const [providerSender, setProviderSender] = useState("");
@@ -118,8 +119,9 @@ export default function NotificationsPage() {
     const { data } = await supabase
       .from("site_settings")
       .select("id, value")
-      .in("id", ["sms_provider_username", "sms_provider_api_key", "sms_provider_sender"]);
+      .in("id", ["sms_provider", "sms_provider_username", "sms_provider_api_key", "sms_provider_sender"]);
     (data || []).forEach((s: any) => {
+      if (s.id === "sms_provider") setSmsProvider(s.value || "msegat");
       if (s.id === "sms_provider_username") setProviderUsername(s.value || "");
       if (s.id === "sms_provider_api_key") setProviderApiKey(s.value || "");
       if (s.id === "sms_provider_sender") setProviderSender(s.value || "");
@@ -129,6 +131,7 @@ export default function NotificationsPage() {
   const handleSaveProvider = async () => {
     setSavingProvider(true);
     const updates = [
+      supabase.from("site_settings").update({ value: smsProvider }).eq("id", "sms_provider"),
       supabase.from("site_settings").update({ value: providerUsername }).eq("id", "sms_provider_username"),
       supabase.from("site_settings").update({ value: providerApiKey }).eq("id", "sms_provider_api_key"),
       supabase.from("site_settings").update({ value: providerSender }).eq("id", "sms_provider_sender"),
@@ -512,37 +515,61 @@ export default function NotificationsPage() {
         <TabsContent value="provider">
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-lg">إعدادات مزود خدمة SMS (MSEGAT)</CardTitle>
+              <CardTitle className="text-lg">إعدادات مزود خدمة SMS</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-2">
-                <Label>اسم المستخدم</Label>
-                <Input
-                  value={providerUsername}
-                  onChange={(e) => setProviderUsername(e.target.value)}
-                  placeholder="اسم مستخدم MSEGAT"
-                  dir="ltr"
-                />
+                <Label>المزود</Label>
+                <Select value={smsProvider} onValueChange={setSmsProvider}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="msegat">MSEGAT</SelectItem>
+                    <SelectItem value="unifonic">Unifonic</SelectItem>
+                    <SelectItem value="taqnyat">Taqnyat (تقنيات)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {smsProvider === "msegat" && (
+                <div className="space-y-2">
+                  <Label>اسم المستخدم</Label>
+                  <Input
+                    value={providerUsername}
+                    onChange={(e) => setProviderUsername(e.target.value)}
+                    placeholder="اسم مستخدم MSEGAT"
+                    dir="ltr"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label>مفتاح API</Label>
+                <Label>
+                  {smsProvider === "msegat" ? "مفتاح API" : smsProvider === "unifonic" ? "App SID" : "Bearer Token"}
+                </Label>
                 <Input
                   type="password"
                   value={providerApiKey}
                   onChange={(e) => setProviderApiKey(e.target.value)}
-                  placeholder="API Key"
+                  placeholder={smsProvider === "unifonic" ? "App SID" : smsProvider === "taqnyat" ? "Bearer Token" : "API Key"}
                   dir="ltr"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label>اسم المرسل</Label>
+                <Label>اسم المرسل (Sender ID)</Label>
                 <Input
                   value={providerSender}
                   onChange={(e) => setProviderSender(e.target.value)}
                   placeholder="Sender Name"
                   dir="ltr"
                 />
+                {smsProvider === "unifonic" && (
+                  <p className="text-xs text-muted-foreground">اختياري - سيُستخدم الافتراضي إن ترك فارغاً</p>
+                )}
               </div>
+
               <Button onClick={handleSaveProvider} disabled={savingProvider} className="gap-1.5">
                 <Save className="h-4 w-4" />
                 {savingProvider ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
