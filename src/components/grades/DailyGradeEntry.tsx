@@ -4,10 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Save } from "lucide-react";
+import { Save, CircleCheck, CircleMinus, CircleX } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface GradeCategory {
   id: string;
@@ -22,6 +22,30 @@ interface StudentGrade {
   grades: Record<string, number | null>;
   grade_ids: Record<string, string>;
 }
+
+type GradeLevel = "excellent" | "average" | "zero";
+
+const gradeLevelConfig: Record<GradeLevel, { label: string; icon: typeof CircleCheck; colorClass: string }> = {
+  excellent: { label: "ممتاز", icon: CircleCheck, colorClass: "text-green-500" },
+  average: { label: "متوسط", icon: CircleMinus, colorClass: "text-yellow-500" },
+  zero: { label: "صفر", icon: CircleX, colorClass: "text-red-500" },
+};
+
+const getGradeLevel = (score: number | null, maxScore: number): GradeLevel | null => {
+  if (score === null || score === undefined) return null;
+  const pct = (score / maxScore) * 100;
+  if (pct >= 70) return "excellent";
+  if (pct > 0) return "average";
+  return "zero";
+};
+
+const getLevelScore = (level: GradeLevel, maxScore: number): number => {
+  switch (level) {
+    case "excellent": return maxScore;
+    case "average": return Math.round(maxScore / 2);
+    case "zero": return 0;
+  }
+};
 
 export default function DailyGradeEntry() {
   const { user } = useAuth();
@@ -83,12 +107,12 @@ export default function DailyGradeEntry() {
     );
   };
 
-  const updateGrade = (studentId: string, categoryId: string, value: string) => {
-    const numValue = value === "" ? null : Math.min(100, Math.max(0, Number(value)));
+  const setGradeByLevel = (studentId: string, categoryId: string, level: GradeLevel, maxScore: number) => {
+    const score = getLevelScore(level, maxScore);
     setStudentGrades((prev) =>
       prev.map((sg) =>
         sg.student_id === studentId
-          ? { ...sg, grades: { ...sg.grades, [categoryId]: numValue } }
+          ? { ...sg, grades: { ...sg.grades, [categoryId]: score } }
           : sg
       )
     );
@@ -106,6 +130,11 @@ export default function DailyGradeEntry() {
       }
     });
     return totalWeight > 0 ? ((total / totalWeight) * 100).toFixed(1) : "—";
+  };
+
+  const calcPercentage = (score: number | null, maxScore: number) => {
+    if (score === null || score === undefined) return "—";
+    return `${Math.round((score / maxScore) * 100)}%`;
   };
 
   const handleSave = async () => {
@@ -144,7 +173,7 @@ export default function DailyGradeEntry() {
   const visibleCategories = selectedCategory && selectedCategory !== "all"
     ? categories.filter((c) => c.id === selectedCategory)
     : categories;
-  
+
   const isSingleCategory = selectedCategory && selectedCategory !== "all";
 
   return (
@@ -186,46 +215,84 @@ export default function DailyGradeEntry() {
           <p className="text-center py-12 text-muted-foreground">لم يتم إعداد فئات التقييم لهذه الشعبة بعد</p>
         ) : (
           <>
+            {/* Legend */}
+            <div className="flex gap-4 mb-4 text-sm flex-wrap">
+              {(Object.entries(gradeLevelConfig) as [GradeLevel, typeof gradeLevelConfig.excellent][]).map(([key, cfg]) => {
+                const Icon = cfg.icon;
+                return (
+                  <div key={key} className="flex items-center gap-1.5">
+                    <Icon className={cn("h-5 w-5", cfg.colorClass)} />
+                    <span>{cfg.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="rounded-lg border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                     <TableHead className="text-right sticky right-0 bg-muted/50">#</TableHead>
-                     <TableHead className="text-right sticky right-10 bg-muted/50 min-w-[180px]">الطالب</TableHead>
-                     {visibleCategories.map((cat) => (
-                       <TableHead key={cat.id} className="text-center min-w-[100px]">
-                         <div>{cat.name}</div>
-                         <div className="text-xs text-muted-foreground font-normal">
-                           ({Number(cat.weight)}%) من {Number(cat.max_score)}
-                         </div>
-                       </TableHead>
-                     ))}
-                     {!isSingleCategory && <TableHead className="text-center min-w-[80px]">المجموع %</TableHead>}
+                    <TableHead className="text-right sticky right-0 bg-muted/50">#</TableHead>
+                    <TableHead className="text-right sticky right-10 bg-muted/50 min-w-[180px]">الطالب</TableHead>
+                    {visibleCategories.map((cat) => (
+                      <TableHead key={cat.id} className="text-center min-w-[160px]">
+                        <div>{cat.name}</div>
+                        <div className="text-xs text-muted-foreground font-normal">
+                          ({Number(cat.weight)}%)
+                        </div>
+                      </TableHead>
+                    ))}
+                    {!isSingleCategory && <TableHead className="text-center min-w-[80px]">المجموع %</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {studentGrades.map((sg, i) => (
                     <TableRow key={sg.student_id}>
-                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                       <TableCell className="font-medium">{sg.full_name}</TableCell>
-                       {visibleCategories.map((cat) => (
-                         <TableCell key={cat.id} className="text-center">
-                           <Input
-                             type="number"
-                             min={0}
-                             max={Number(cat.max_score)}
-                             value={sg.grades[cat.id] ?? ""}
-                             onChange={(e) => updateGrade(sg.student_id, cat.id, e.target.value)}
-                             className="w-20 mx-auto text-center h-8"
-                             dir="ltr"
-                           />
-                         </TableCell>
-                       ))}
-                       {!isSingleCategory && (
-                         <TableCell className="text-center font-bold">
-                           {calcTotal(sg.grades)}
-                         </TableCell>
-                       )}
+                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="font-medium">{sg.full_name}</TableCell>
+                      {visibleCategories.map((cat) => {
+                        const maxScore = Number(cat.max_score);
+                        const currentScore = sg.grades[cat.id];
+                        const currentLevel = getGradeLevel(currentScore, maxScore);
+
+                        return (
+                          <TableCell key={cat.id} className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {(Object.entries(gradeLevelConfig) as [GradeLevel, typeof gradeLevelConfig.excellent][]).map(([level, cfg]) => {
+                                const Icon = cfg.icon;
+                                const isActive = currentLevel === level;
+                                return (
+                                  <button
+                                    key={level}
+                                    type="button"
+                                    onClick={() => setGradeByLevel(sg.student_id, cat.id, level as GradeLevel, maxScore)}
+                                    className={cn(
+                                      "p-1 rounded-md transition-all hover:scale-110",
+                                      isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-30 hover:opacity-70"
+                                    )}
+                                    title={cfg.label}
+                                  >
+                                    <Icon className={cn("h-6 w-6", cfg.colorClass)} />
+                                  </button>
+                                );
+                              })}
+                              <span className={cn(
+                                "mr-2 text-sm font-semibold min-w-[36px]",
+                                currentLevel === "excellent" ? "text-green-600" :
+                                currentLevel === "average" ? "text-yellow-600" :
+                                currentLevel === "zero" ? "text-red-600" : "text-muted-foreground"
+                              )}>
+                                {calcPercentage(currentScore, maxScore)}
+                              </span>
+                            </div>
+                          </TableCell>
+                        );
+                      })}
+                      {!isSingleCategory && (
+                        <TableCell className="text-center font-bold">
+                          {calcTotal(sg.grades)}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
