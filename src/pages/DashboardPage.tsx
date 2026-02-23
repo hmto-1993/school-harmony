@@ -1,207 +1,301 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, ClipboardCheck, AlertTriangle, Search } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Users, BookOpen, ClipboardCheck, AlertTriangle,
+  TrendingUp, TrendingDown, Clock, Heart, UserCheck, UserX,
+} from "lucide-react";
+import {
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+} from "recharts";
+import { format } from "date-fns";
 
-interface Student {
-  id: string;
-  full_name: string;
-  academic_number: string | null;
-  national_id: string | null;
-  class_id: string | null;
-  classes: { name: string } | null;
+interface ClassStats {
+  name: string;
+  present: number;
+  absent: number;
+  late: number;
+  total: number;
 }
-
-interface StatsData {
-  totalStudents: number;
-  totalClasses: number;
-  todayPresent: number;
-  todayAbsent: number;
-}
-
-const statusLabels: Record<string, { label: string; variant: "default" | "destructive" | "outline" | "secondary" }> = {
-  present: { label: "حاضر", variant: "default" },
-  absent: { label: "غائب", variant: "destructive" },
-  late: { label: "متأخر", variant: "secondary" },
-  early_leave: { label: "منصرف مبكرًا", variant: "outline" },
-  sick_leave: { label: "إجازة مرضية", variant: "outline" },
-};
 
 export default function DashboardPage() {
   const { role } = useAuth();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-  const [search, setSearch] = useState("");
-  const [classFilter, setClassFilter] = useState("all");
-  const [stats, setStats] = useState<StatsData>({ totalStudents: 0, totalClasses: 0, todayPresent: 0, todayAbsent: 0 });
-  const [todayAttendance, setTodayAttendance] = useState<Record<string, string>>({});
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalClasses, setTotalClasses] = useState(0);
+  const [todayPresent, setTodayPresent] = useState(0);
+  const [todayAbsent, setTodayAbsent] = useState(0);
+  const [todayLate, setTodayLate] = useState(0);
+  const [todayNotRecorded, setTodayNotRecorded] = useState(0);
+  const [behaviorPositive, setBehaviorPositive] = useState(0);
+  const [behaviorNegative, setBehaviorNegative] = useState(0);
+  const [behaviorNeutral, setBehaviorNeutral] = useState(0);
+  const [classStats, setClassStats] = useState<ClassStats[]>([]);
+  const [attendanceRate, setAttendanceRate] = useState(0);
 
   useEffect(() => {
-    fetchData();
+    fetchAll();
   }, []);
 
-  const fetchData = async () => {
-    // جلب الطلاب مع الشعبة
-    const { data: studentsData } = await supabase
-      .from("students")
-      .select("id, full_name, academic_number, national_id, class_id, classes(name)")
-      .order("full_name");
+  const fetchAll = async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
 
-    // جلب الشعب
-    const { data: classesData } = await supabase
-      .from("classes")
-      .select("id, name")
-      .order("name");
+    const [
+      { data: studentsData },
+      { data: classesData },
+      { data: attendanceData },
+      { data: behaviorData },
+    ] = await Promise.all([
+      supabase.from("students").select("id, class_id"),
+      supabase.from("classes").select("id, name"),
+      supabase.from("attendance_records").select("student_id, status, class_id").eq("date", today),
+      supabase.from("behavior_records").select("type").eq("date", today),
+    ]);
 
-    // جلب حضور اليوم
-    const today = new Date().toISOString().split("T")[0];
-    const { data: attendanceData } = await supabase
-      .from("attendance_records")
-      .select("student_id, status")
-      .eq("date", today);
+    const students = studentsData || [];
+    const classes = classesData || [];
+    const attendance = attendanceData || [];
+    const behavior = behaviorData || [];
 
-    const attendanceMap: Record<string, string> = {};
-    attendanceData?.forEach((r) => {
-      attendanceMap[r.student_id] = r.status;
+    setTotalStudents(students.length);
+    setTotalClasses(classes.length);
+
+    const present = attendance.filter((r) => r.status === "present").length;
+    const absent = attendance.filter((r) => r.status === "absent").length;
+    const late = attendance.filter((r) => r.status === "late").length;
+    const recorded = attendance.length;
+    const notRecorded = students.length - recorded;
+
+    setTodayPresent(present);
+    setTodayAbsent(absent);
+    setTodayLate(late);
+    setTodayNotRecorded(notRecorded > 0 ? notRecorded : 0);
+    setAttendanceRate(students.length > 0 ? Math.round((present / students.length) * 100) : 0);
+
+    setBehaviorPositive(behavior.filter((b) => b.type === "positive").length);
+    setBehaviorNegative(behavior.filter((b) => b.type === "negative").length);
+    setBehaviorNeutral(behavior.filter((b) => b.type === "neutral").length);
+
+    // Per-class attendance stats
+    const classMap: Record<string, ClassStats> = {};
+    classes.forEach((c) => {
+      classMap[c.id] = { name: c.name, present: 0, absent: 0, late: 0, total: 0 };
     });
-
-    setStudents((studentsData as Student[]) || []);
-    setClasses(classesData || []);
-    setTodayAttendance(attendanceMap);
-
-    const totalStudents = studentsData?.length || 0;
-    const totalClasses = classesData?.length || 0;
-    const todayPresent = attendanceData?.filter((r) => r.status === "present").length || 0;
-    const todayAbsent = attendanceData?.filter((r) => r.status === "absent").length || 0;
-
-    setStats({ totalStudents, totalClasses, todayPresent, todayAbsent });
+    students.forEach((s) => {
+      if (s.class_id && classMap[s.class_id]) classMap[s.class_id].total++;
+    });
+    attendance.forEach((a) => {
+      if (a.class_id && classMap[a.class_id]) {
+        if (a.status === "present") classMap[a.class_id].present++;
+        else if (a.status === "absent") classMap[a.class_id].absent++;
+        else if (a.status === "late") classMap[a.class_id].late++;
+      }
+    });
+    setClassStats(Object.values(classMap).filter((c) => c.total > 0));
   };
 
-  // بحث وتصفية
-  const filtered = useMemo(() => {
-    let result = students;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.full_name.toLowerCase().includes(q) ||
-          s.academic_number?.toLowerCase().includes(q)
-      );
-    }
-    if (classFilter !== "all") {
-      result = result.filter((s) => s.class_id === classFilter);
-    }
-    return result;
-  }, [students, search, classFilter]);
+  const attendancePieData = [
+    { name: "حاضر", value: todayPresent },
+    { name: "غائب", value: todayAbsent },
+    { name: "متأخر", value: todayLate },
+    { name: "لم يُسجَّل", value: todayNotRecorded },
+  ].filter((d) => d.value > 0);
+
+  const PIE_COLORS = ["hsl(142, 71%, 45%)", "hsl(0, 84%, 60%)", "hsl(45, 93%, 47%)", "hsl(215, 15%, 70%)"];
+
+  const behaviorPieData = [
+    { name: "إيجابي", value: behaviorPositive },
+    { name: "سلبي", value: behaviorNegative },
+    { name: "محايد", value: behaviorNeutral },
+  ].filter((d) => d.value > 0);
+
+  const BEHAVIOR_COLORS = ["hsl(142, 71%, 45%)", "hsl(0, 84%, 60%)", "hsl(45, 93%, 47%)"];
 
   const statCards = [
-    { label: "إجمالي الطلاب", value: stats.totalStudents, icon: Users, color: "text-primary" },
-    { label: "عدد الشُعب", value: stats.totalClasses, icon: BookOpen, color: "text-info" },
-    { label: "الحضور اليوم", value: stats.todayPresent, icon: ClipboardCheck, color: "text-success" },
-    { label: "الغياب اليوم", value: stats.todayAbsent, icon: AlertTriangle, color: "text-destructive" },
+    { label: "إجمالي الطلاب", value: totalStudents, icon: Users, color: "text-primary", bg: "bg-primary/10" },
+    { label: "عدد الشُعب", value: totalClasses, icon: BookOpen, color: "text-accent-foreground", bg: "bg-accent/20" },
+    { label: "الحضور اليوم", value: todayPresent, icon: UserCheck, color: "text-green-600", bg: "bg-green-100" },
+    { label: "الغياب اليوم", value: todayAbsent, icon: UserX, color: "text-destructive", bg: "bg-destructive/10" },
+    { label: "المتأخرون", value: todayLate, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-100" },
+    { label: "نسبة الحضور", value: `${attendanceRate}%`, icon: TrendingUp, color: "text-primary", bg: "bg-primary/10" },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* العنوان */}
       <div>
         <h1 className="text-2xl font-bold">لوحة التحكم</h1>
-        <p className="text-muted-foreground">مرحبًا بك في نظام إدارة ثانوية الفيصلية</p>
+        <p className="text-muted-foreground">
+          إحصائيات اليوم — {format(new Date(), "yyyy/MM/dd")}
+        </p>
       </div>
 
-      {/* بطاقات الإحصائيات */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {statCards.map((stat) => (
           <Card key={stat.label} className="shadow-card hover:shadow-card-hover transition-shadow">
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className={`rounded-xl p-3 bg-muted ${stat.color}`}>
-                <stat.icon className="h-6 w-6" />
+            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+              <div className={`rounded-xl p-2.5 ${stat.bg}`}>
+                <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-              </div>
+              <p className="text-2xl font-bold">{stat.value}</p>
+              <p className="text-xs text-muted-foreground leading-tight">{stat.label}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* البحث والتصفية */}
-      <Card className="shadow-card">
-        <CardContent className="p-5">
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="بحث بالاسم أو الرقم الأكاديمي..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pr-10"
-              />
-            </div>
-            <Select value={classFilter} onValueChange={setClassFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="جميع الشُعب" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الشُعب</SelectItem>
-                {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Attendance Pie */}
+        <Card className="shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              توزيع الحضور اليوم
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {attendancePieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={attendancePieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {attendancePieData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-center text-sm text-muted-foreground py-12">لا توجد بيانات حضور اليوم</p>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* جدول الطلاب */}
-          <div className="rounded-lg border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-right">#</TableHead>
-                  <TableHead className="text-right">الاسم الكامل</TableHead>
-                  <TableHead className="text-right">الرقم الأكاديمي</TableHead>
-                  <TableHead className="text-right">الشعبة</TableHead>
-                  <TableHead className="text-right">حالة اليوم</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      لا توجد نتائج
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((student, i) => {
-                    const status = todayAttendance[student.id];
-                    const statusInfo = status ? statusLabels[status] : null;
+        {/* Behavior Pie */}
+        <Card className="shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Heart className="h-4 w-4" />
+              سلوك الطلاب اليوم
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {behaviorPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={behaviorPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {behaviorPieData.map((_, i) => (
+                      <Cell key={i} fill={BEHAVIOR_COLORS[i % BEHAVIOR_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-center text-sm text-muted-foreground py-12">لا توجد بيانات سلوك اليوم</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Per-Class Attendance Bar Chart */}
+      {classStats.length > 0 && (
+        <Card className="shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              الحضور حسب الشُعبة
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={classStats} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="present" name="حاضر" fill="hsl(142, 71%, 45%)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="absent" name="غائب" fill="hsl(0, 84%, 60%)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="late" name="متأخر" fill="hsl(45, 93%, 47%)" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Per-Class Summary Table (numbers only, no names) */}
+      {classStats.length > 0 && (
+        <Card className="shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              ملخص الشُعب
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-right p-2.5 font-medium">الشُعبة</th>
+                    <th className="text-center p-2.5 font-medium">عدد الطلاب</th>
+                    <th className="text-center p-2.5 font-medium">حاضر</th>
+                    <th className="text-center p-2.5 font-medium">غائب</th>
+                    <th className="text-center p-2.5 font-medium">متأخر</th>
+                    <th className="text-center p-2.5 font-medium">نسبة الحضور</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {classStats.map((cls) => {
+                    const rate = cls.total > 0 ? Math.round((cls.present / cls.total) * 100) : 0;
                     return (
-                      <TableRow key={student.id} className="hover:bg-muted/30">
-                        <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-medium">{student.full_name}</TableCell>
-                        <TableCell className="text-muted-foreground">{student.academic_number || "—"}</TableCell>
-                        <TableCell>{student.classes?.name || "—"}</TableCell>
-                        <TableCell>
-                          {statusInfo ? (
-                            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">لم يُسجَّل</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
+                      <tr key={cls.name} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="p-2.5 font-medium">{cls.name}</td>
+                        <td className="p-2.5 text-center">{cls.total}</td>
+                        <td className="p-2.5 text-center text-green-600 font-medium">{cls.present}</td>
+                        <td className="p-2.5 text-center text-destructive font-medium">{cls.absent}</td>
+                        <td className="p-2.5 text-center text-yellow-600 font-medium">{cls.late}</td>
+                        <td className="p-2.5 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                            rate >= 80 ? "bg-green-100 text-green-700" :
+                            rate >= 50 ? "bg-yellow-100 text-yellow-700" :
+                            "bg-red-100 text-red-700"
+                          }`}>
+                            {rate}%
+                          </span>
+                        </td>
+                      </tr>
                     );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
