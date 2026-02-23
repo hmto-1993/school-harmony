@@ -8,6 +8,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Settings as SettingsIcon,
   Plus,
   Trash2,
@@ -82,6 +89,12 @@ export default function SettingsPage() {
   // Edit category
   const [editingCats, setEditingCats] = useState<Record<string, { weight: number; max_score: number }>>({});
   const [savingCats, setSavingCats] = useState(false);
+
+  // New category form
+  const [newCatClassId, setNewCatClassId] = useState("");
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatWeight, setNewCatWeight] = useState(10);
+  const [newCatMaxScore, setNewCatMaxScore] = useState(100);
 
   const fetchData = async () => {
     setLoading(true);
@@ -167,11 +180,43 @@ export default function SettingsPage() {
     setSavingCats(false);
   };
 
+  const handleAddCategory = async () => {
+    if (!newCatName.trim() || !newCatClassId) return;
+    const classCats = categories.filter((c) => c.class_id === newCatClassId);
+    const maxOrder = classCats.length > 0 ? Math.max(...classCats.map((c) => c.sort_order)) : 0;
+    const { error } = await supabase.from("grade_categories").insert({
+      name: newCatName,
+      weight: newCatWeight,
+      max_score: newCatMaxScore,
+      class_id: newCatClassId,
+      sort_order: maxOrder + 1,
+    });
+    if (error) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تمت الإضافة", description: `تمت إضافة فئة "${newCatName}"` });
+      setNewCatName("");
+      setNewCatWeight(10);
+      setNewCatMaxScore(100);
+      fetchData();
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    const { error } = await supabase.from("grade_categories").delete().eq("id", id);
+    if (error) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تم الحذف" });
+      fetchData();
+    }
+  };
+
   // Group categories by class
-  const catsByClass = categories.reduce<Record<string, GradeCategory[]>>((acc, cat) => {
+  const catsByClass = categories.reduce<Record<string, { classId: string; cats: GradeCategory[] }>>((acc, cat) => {
     const key = cat.class_name || "—";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(cat);
+    if (!acc[key]) acc[key] = { classId: cat.class_id || "", cats: [] };
+    acc[key].cats.push(cat);
     return acc;
   }, {});
 
@@ -326,22 +371,90 @@ export default function SettingsPage() {
         {/* ===== فئات التقييم ===== */}
         <TabsContent value="categories">
           <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-lg">فئات التقييم</CardTitle>
               {isAdmin && (
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handleSaveCategories}
-                  disabled={savingCats}
-                >
-                  <Save className="h-4 w-4" />
-                  {savingCats ? "جارٍ الحفظ..." : "حفظ التغييرات"}
-                </Button>
+                <div className="flex gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        إضافة فئة تقييم
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent dir="rtl">
+                      <DialogHeader>
+                        <DialogTitle>إضافة فئة تقييم جديدة</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label>الشعبة</Label>
+                          <Select value={newCatClassId} onValueChange={setNewCatClassId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="اختر الشعبة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {classes.map((cls) => (
+                                <SelectItem key={cls.id} value={cls.id}>
+                                  {cls.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>اسم الفئة</Label>
+                          <Input
+                            placeholder="مثال: اختبار نهائي"
+                            value={newCatName}
+                            onChange={(e) => setNewCatName(e.target.value)}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>الوزن (%)</Label>
+                            <Input
+                              type="number"
+                              value={newCatWeight}
+                              onChange={(e) => setNewCatWeight(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>الدرجة القصوى</Label>
+                            <Input
+                              type="number"
+                              value={newCatMaxScore}
+                              onChange={(e) => setNewCatMaxScore(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline">إلغاء</Button>
+                        </DialogClose>
+                        <DialogClose asChild>
+                          <Button onClick={handleAddCategory} disabled={!newCatName.trim() || !newCatClassId}>
+                            إضافة
+                          </Button>
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={handleSaveCategories}
+                    disabled={savingCats}
+                  >
+                    <Save className="h-4 w-4" />
+                    {savingCats ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+                  </Button>
+                </div>
               )}
             </CardHeader>
             <CardContent className="space-y-6">
-              {Object.entries(catsByClass).map(([className, cats]) => (
+              {Object.entries(catsByClass).map(([className, { cats }]) => (
                 <div key={className}>
                   <h3 className="font-semibold text-sm text-muted-foreground mb-2">
                     الشعبة: {className}
@@ -352,6 +465,7 @@ export default function SettingsPage() {
                         <TableHead className="text-right">الفئة</TableHead>
                         <TableHead className="text-right">الوزن (%)</TableHead>
                         <TableHead className="text-right">الدرجة القصوى</TableHead>
+                        {isAdmin && <TableHead className="text-right">إجراءات</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -398,6 +512,34 @@ export default function SettingsPage() {
                               <span>{cat.max_score}</span>
                             )}
                           </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent dir="rtl">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>حذف فئة "{cat.name}"؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      سيتم حذف هذه الفئة وجميع الدرجات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      onClick={() => handleDeleteCategory(cat.id)}
+                                    >
+                                      حذف
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
