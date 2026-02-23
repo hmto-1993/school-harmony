@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CircleCheck, CircleMinus, CircleX, Undo2 } from "lucide-react";
+import { Save, CircleCheck, Star, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GradeCategory {
@@ -24,32 +24,23 @@ interface StudentGrade {
   grade_ids: Record<string, string>;
 }
 
-type GradeLevel = "excellent" | "average" | "zero";
-
-const gradeLevelConfig: Record<GradeLevel, { label: string; icon: typeof CircleCheck; colorClass: string }> = {
-  excellent: { label: "ممتاز", icon: CircleCheck, colorClass: "text-green-500" },
-  average: { label: "متوسط", icon: CircleMinus, colorClass: "text-yellow-500" },
-  zero: { label: "صفر", icon: CircleX, colorClass: "text-red-500" },
-};
-
 // Categories that use numeric input instead of icons
 const NUMERIC_CATEGORIES = ["اختبار عملي", "اختبار الفترة"];
-
 const isNumericCategory = (name: string) => NUMERIC_CATEGORIES.includes(name);
 
-const getGradeLevel = (score: number | null, maxScore: number): GradeLevel | null => {
-  if (score === null || score === undefined) return null;
-  const pct = (score / maxScore) * 100;
-  if (pct >= 70) return "excellent";
-  if (pct > 0) return "average";
-  return "zero";
+// Config for icon-based categories: max clicks and increment per click
+const getCategoryConfig = (name: string, maxScore: number) => {
+  if (name === "المشاركة") return { maxClicks: 3, increment: Math.round(maxScore / 4) };
+  return { maxClicks: 1, increment: Math.round(maxScore / 2) };
 };
 
-// Increment values for icon-based categories
-const LEVEL_INCREMENT: Record<GradeLevel, number> = {
-  excellent: 10,
-  average: 5,
-  zero: 0,
+const getClickCount = (score: number | null, increment: number): number => {
+  if (!score || score <= 0 || increment <= 0) return 0;
+  return Math.min(Math.floor(score / increment), 10);
+};
+
+const isStarred = (score: number | null, maxScore: number): boolean => {
+  return score !== null && score >= maxScore;
 };
 
 export default function DailyGradeEntry() {
@@ -112,18 +103,32 @@ export default function DailyGradeEntry() {
     );
   };
 
-  const addGradeByLevel = (studentId: string, categoryId: string, level: GradeLevel, maxScore: number) => {
+  const addClick = (studentId: string, categoryId: string, catName: string, maxScore: number) => {
+    const config = getCategoryConfig(catName, maxScore);
     setStudentGrades((prev) =>
       prev.map((sg) => {
         if (sg.student_id !== studentId) return sg;
         const current = sg.grades[categoryId] ?? 0;
-        let newScore: number;
-        if (level === "zero") {
-          newScore = 0;
-        } else {
-          newScore = Math.min(current + LEVEL_INCREMENT[level], maxScore);
-        }
+        const currentClicks = getClickCount(current, config.increment);
+        if (currentClicks >= config.maxClicks) return sg;
+        const starred = isStarred(current, maxScore);
+        const newScore = Math.min((currentClicks + 1) * config.increment, starred ? maxScore : maxScore);
         return { ...sg, grades: { ...sg.grades, [categoryId]: newScore } };
+      })
+    );
+  };
+
+  const toggleStar = (studentId: string, categoryId: string, catName: string, maxScore: number) => {
+    setStudentGrades((prev) =>
+      prev.map((sg) => {
+        if (sg.student_id !== studentId) return sg;
+        const current = sg.grades[categoryId] ?? 0;
+        if (isStarred(current, maxScore)) {
+          // Remove star: go back to max clicks score
+          const config = getCategoryConfig(catName, maxScore);
+          return { ...sg, grades: { ...sg.grades, [categoryId]: config.maxClicks * config.increment } };
+        }
+        return { ...sg, grades: { ...sg.grades, [categoryId]: maxScore } };
       })
     );
   };
@@ -161,11 +166,6 @@ export default function DailyGradeEntry() {
       }
     });
     return totalWeight > 0 ? ((total / totalWeight) * 100).toFixed(1) : "—";
-  };
-
-  const calcPercentage = (score: number | null, maxScore: number) => {
-    if (score === null || score === undefined) return "—";
-    return `${Math.round((score / maxScore) * 100)}%`;
   };
 
   const handleSave = async () => {
@@ -248,18 +248,14 @@ export default function DailyGradeEntry() {
           <>
             {/* Legend */}
             <div className="flex gap-4 mb-4 text-sm flex-wrap">
-              {(Object.entries(gradeLevelConfig) as [GradeLevel, typeof gradeLevelConfig.excellent][]).map(([key, cfg]) => {
-                const Icon = cfg.icon;
-                return (
-                  <div key={key} className="flex items-center gap-1.5">
-                    <Icon className={cn("h-5 w-5", cfg.colorClass)} />
-                    <span>{cfg.label}</span>
-                    {key !== "zero" && (
-                      <span className="text-muted-foreground text-xs">(+{LEVEL_INCREMENT[key as GradeLevel]})</span>
-                    )}
-                  </div>
-                );
-              })}
+              <div className="flex items-center gap-1.5">
+                <CircleCheck className="h-5 w-5 text-primary" />
+                <span>إضافة نقطة</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Star className="h-5 w-5 text-amber-500" />
+                <span>نجمة التميز (الدرجة الكاملة)</span>
+              </div>
               <div className="flex items-center gap-1.5">
                 <Undo2 className="h-4 w-4 text-muted-foreground" />
                 <span>تراجع</span>
@@ -273,14 +269,11 @@ export default function DailyGradeEntry() {
                     <TableHead className="text-right sticky right-0 bg-muted/50">#</TableHead>
                     <TableHead className="text-right sticky right-10 bg-muted/50 min-w-[180px]">الطالب</TableHead>
                     {visibleCategories.map((cat) => (
-                      <TableHead key={cat.id} className="text-center min-w-[160px]">
+                      <TableHead key={cat.id} className="text-center min-w-[140px]">
                         <div>{cat.name}</div>
-                        <div className="text-xs text-muted-foreground font-normal">
-                          ({Number(cat.weight)}%)
-                        </div>
                       </TableHead>
                     ))}
-                    {!isSingleCategory && <TableHead className="text-center min-w-[80px]">المجموع %</TableHead>}
+                    {!isSingleCategory && <TableHead className="text-center min-w-[80px]">المجموع</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -306,51 +299,67 @@ export default function DailyGradeEntry() {
                                   className="w-20 text-center h-8"
                                   placeholder={`/${maxScore}`}
                                 />
-                                <span className="text-xs text-muted-foreground min-w-[36px]">
-                                  {calcPercentage(currentScore, maxScore)}
-                                </span>
                               </div>
                             </TableCell>
                           );
                         }
 
-                        const currentLevel = getGradeLevel(currentScore, maxScore);
+                        const config = getCategoryConfig(cat.name, maxScore);
+                        const clicks = getClickCount(currentScore, config.increment);
+                        const starred = isStarred(currentScore, maxScore);
 
                         return (
                           <TableCell key={cat.id} className="text-center">
                             <div className="flex items-center justify-center gap-1">
-                              {(Object.entries(gradeLevelConfig) as [GradeLevel, typeof gradeLevelConfig.excellent][]).map(([level, cfg]) => {
-                                const Icon = cfg.icon;
-                                return (
-                                  <button
-                                    key={level}
-                                    type="button"
-                                    onClick={() => addGradeByLevel(sg.student_id, cat.id, level as GradeLevel, maxScore)}
-                                    className={cn(
-                                      "p-1 rounded-md transition-all hover:scale-110",
-                                      "opacity-50 hover:opacity-100"
-                                    )}
-                                    title={`${cfg.label} (+${LEVEL_INCREMENT[level as GradeLevel]})`}
-                                  >
-                                    <Icon className={cn("h-6 w-6", cfg.colorClass)} />
-                                  </button>
-                                );
-                              })}
+                              {/* Main click icon with count */}
+                              <button
+                                type="button"
+                                onClick={() => addClick(sg.student_id, cat.id, cat.name, maxScore)}
+                                className={cn(
+                                  "p-1 rounded-md transition-all hover:scale-110 relative",
+                                  clicks > 0 ? "opacity-100" : "opacity-40 hover:opacity-70"
+                                )}
+                                title={`إضافة نقطة (${clicks}/${config.maxClicks})`}
+                                disabled={clicks >= config.maxClicks}
+                              >
+                                <CircleCheck className={cn("h-6 w-6", clicks > 0 ? "text-primary" : "text-muted-foreground")} />
+                                {clicks > 0 && (
+                                  <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                                    {clicks}
+                                  </span>
+                                )}
+                              </button>
+
+                              {/* Star for excellence */}
+                              <button
+                                type="button"
+                                onClick={() => toggleStar(sg.student_id, cat.id, cat.name, maxScore)}
+                                className={cn(
+                                  "p-1 rounded-md transition-all hover:scale-110",
+                                  starred ? "opacity-100" : "opacity-40 hover:opacity-70"
+                                )}
+                                title="نجمة التميز"
+                              >
+                                <Star className={cn("h-6 w-6", starred ? "text-amber-500 fill-amber-500" : "text-muted-foreground")} />
+                              </button>
+
+                              {/* Undo */}
                               <button
                                 type="button"
                                 onClick={() => clearGrade(sg.student_id, cat.id)}
                                 className="p-1 rounded-md transition-all hover:scale-110 opacity-40 hover:opacity-100"
                                 title="تراجع"
                               >
-                                <Undo2 className="h-5 w-5 text-muted-foreground" />
+                                <Undo2 className="h-4 w-4 text-muted-foreground" />
                               </button>
+
+                              {/* Score display */}
                               <span className={cn(
-                                "mr-2 text-sm font-semibold min-w-[36px]",
-                                currentLevel === "excellent" ? "text-green-600" :
-                                currentLevel === "average" ? "text-yellow-600" :
-                                currentLevel === "zero" ? "text-red-600" : "text-muted-foreground"
+                                "mr-1 text-sm font-semibold min-w-[28px]",
+                                starred ? "text-amber-600" :
+                                clicks > 0 ? "text-primary" : "text-muted-foreground"
                               )}>
-                                {currentScore !== null && currentScore !== undefined ? `${currentScore}/${maxScore}` : "—"}
+                                {currentScore !== null && currentScore !== undefined ? currentScore : "—"}
                               </span>
                             </div>
                           </TableCell>
