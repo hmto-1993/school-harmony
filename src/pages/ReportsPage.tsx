@@ -490,7 +490,7 @@ export default function ReportsPage() {
 
         {/* ===== Attendance Report ===== */}
         <TabsContent value="attendance" className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 print:hidden">
             <Button onClick={fetchAttendance} disabled={loadingAttendance || !selectedClass}>
               <BarChart3 className="h-4 w-4 ml-1.5" />
               {loadingAttendance ? "جارٍ التحميل..." : "عرض التقرير"}
@@ -598,7 +598,7 @@ export default function ReportsPage() {
 
         {/* ===== Grades Report ===== */}
         <TabsContent value="grades" className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 print:hidden">
             <Button onClick={fetchGrades} disabled={loadingGrades || !selectedClass}>
               <BarChart3 className="h-4 w-4 ml-1.5" />
               {loadingGrades ? "جارٍ التحميل..." : "عرض التقرير"}
