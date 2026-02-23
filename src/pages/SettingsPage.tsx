@@ -30,6 +30,7 @@ import {
   Pencil,
   Check,
   X,
+  MessageSquare,
 } from "lucide-react";
 import {
   Dialog,
@@ -140,6 +141,13 @@ export default function SettingsPage() {
   const [editingCats, setEditingCats] = useState<Record<string, { weight: number; max_score: number }>>({});
   const [savingCats, setSavingCats] = useState(false);
 
+  // SMS Provider settings
+  const [smsProvider, setSmsProvider] = useState("msegat");
+  const [providerUsername, setProviderUsername] = useState("");
+  const [providerApiKey, setProviderApiKey] = useState("");
+  const [providerSender, setProviderSender] = useState("");
+  const [savingProvider, setSavingProvider] = useState(false);
+
   // New category form
   const [newCatClassId, setNewCatClassId] = useState("");
   const [newCatName, setNewCatName] = useState("");
@@ -208,7 +216,39 @@ export default function SettingsPage() {
       .single();
     if (lhSetting?.value) setLetterheadUrl(lhSetting.value);
 
+    // Fetch SMS provider settings
+    if (isAdmin) {
+      const { data: smsData } = await supabase
+        .from("site_settings")
+        .select("id, value")
+        .in("id", ["sms_provider", "sms_provider_username", "sms_provider_api_key", "sms_provider_sender"]);
+      (smsData || []).forEach((s: any) => {
+        if (s.id === "sms_provider") setSmsProvider(s.value || "msegat");
+        if (s.id === "sms_provider_username") setProviderUsername(s.value || "");
+        if (s.id === "sms_provider_api_key") setProviderApiKey(s.value || "");
+        if (s.id === "sms_provider_sender") setProviderSender(s.value || "");
+      });
+    }
+
     setLoading(false);
+  };
+
+  const handleSaveProvider = async () => {
+    setSavingProvider(true);
+    const updates = [
+      supabase.from("site_settings").update({ value: smsProvider }).eq("id", "sms_provider"),
+      supabase.from("site_settings").update({ value: providerUsername }).eq("id", "sms_provider_username"),
+      supabase.from("site_settings").update({ value: providerApiKey }).eq("id", "sms_provider_api_key"),
+      supabase.from("site_settings").update({ value: providerSender }).eq("id", "sms_provider_sender"),
+    ];
+    const results = await Promise.all(updates);
+    setSavingProvider(false);
+    const hasError = results.some((r) => r.error);
+    if (hasError) {
+      toast({ title: "خطأ", description: "فشل حفظ إعدادات المزود", variant: "destructive" });
+    } else {
+      toast({ title: "تم الحفظ", description: "تم تحديث إعدادات مزود SMS" });
+    }
   };
 
   useEffect(() => {
@@ -629,6 +669,10 @@ export default function SettingsPage() {
               <TabsTrigger value="letterhead" className="gap-1.5">
                 <Printer className="h-4 w-4" />
                 ورقة الطباعة
+              </TabsTrigger>
+              <TabsTrigger value="sms-provider" className="gap-1.5">
+                <MessageSquare className="h-4 w-4" />
+                مزود SMS
               </TabsTrigger>
             </>
           )}
@@ -1284,6 +1328,71 @@ export default function SettingsPage() {
                       onChange={handleUploadLetterhead}
                     />
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="sms-provider">
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="text-lg">إعدادات مزود خدمة SMS</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label>المزود</Label>
+                    <Select value={smsProvider} onValueChange={setSmsProvider}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="msegat">MSEGAT</SelectItem>
+                        <SelectItem value="unifonic">Unifonic</SelectItem>
+                        <SelectItem value="taqnyat">Taqnyat (تقنيات)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {smsProvider === "msegat" && (
+                    <div className="space-y-2">
+                      <Label>اسم المستخدم</Label>
+                      <Input
+                        value={providerUsername}
+                        onChange={(e) => setProviderUsername(e.target.value)}
+                        placeholder="اسم مستخدم MSEGAT"
+                        dir="ltr"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>
+                      {smsProvider === "msegat" ? "مفتاح API" : smsProvider === "unifonic" ? "App SID" : "Bearer Token"}
+                    </Label>
+                    <Input
+                      type="password"
+                      value={providerApiKey}
+                      onChange={(e) => setProviderApiKey(e.target.value)}
+                      placeholder={smsProvider === "unifonic" ? "App SID" : smsProvider === "taqnyat" ? "Bearer Token" : "API Key"}
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>اسم المرسل (Sender ID)</Label>
+                    <Input
+                      value={providerSender}
+                      onChange={(e) => setProviderSender(e.target.value)}
+                      placeholder="Sender Name"
+                      dir="ltr"
+                    />
+                    {smsProvider === "unifonic" && (
+                      <p className="text-xs text-muted-foreground">اختياري - سيُستخدم الافتراضي إن ترك فارغاً</p>
+                    )}
+                  </div>
+
+                  <Button onClick={handleSaveProvider} disabled={savingProvider} className="gap-1.5">
+                    <Save className="h-4 w-4" />
+                    {savingProvider ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>
