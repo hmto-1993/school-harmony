@@ -31,6 +31,9 @@ import {
   Calendar,
   Users,
   Heart,
+  Printer,
+  Send,
+  UserCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +50,7 @@ interface ClassOption {
 
 interface AttendanceRow {
   student_name: string;
+  student_id?: string;
   date: string;
   status: string;
   notes: string | null;
@@ -75,6 +79,9 @@ export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [reportType, setReportType] = useState<"daily" | "periodic">("daily");
+  const [selectedStudent, setSelectedStudent] = useState<string>("all");
+  const [students, setStudents] = useState<{ id: string; full_name: string; parent_phone: string | null }[]>([]);
+  const [sendingSMS, setSendingSMS] = useState(false);
 
   // Attendance data
   const [attendanceData, setAttendanceData] = useState<AttendanceRow[]>([]);
@@ -105,24 +112,46 @@ export default function ReportsPage() {
     fetchClasses();
   }, [role, user]);
 
+  // Fetch students when class changes
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (!selectedClass) { setStudents([]); return; }
+      const { data } = await supabase
+        .from("students")
+        .select("id, full_name, parent_phone")
+        .eq("class_id", selectedClass)
+        .order("full_name");
+      setStudents(data || []);
+      setSelectedStudent("all");
+    };
+    fetchStudents();
+  }, [selectedClass]);
+
   // ============ Attendance Report ============
 
   const fetchAttendance = async () => {
     if (!selectedClass) return;
     setLoadingAttendance(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("attendance_records")
-      .select("status, notes, date, students(full_name)")
+      .select("status, notes, date, student_id, students(full_name)")
       .eq("class_id", selectedClass)
       .gte("date", dateFrom)
       .lte("date", dateTo)
       .order("date", { ascending: false });
+
+    if (selectedStudent !== "all") {
+      query = query.eq("student_id", selectedStudent);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast({ title: "خطأ", description: error.message, variant: "destructive" });
     } else {
       const rows: AttendanceRow[] = (data || []).map((r: any) => ({
         student_name: r.students?.full_name || "—",
+        student_id: r.student_id,
         date: r.date,
         status: r.status,
         notes: r.notes,
@@ -157,21 +186,28 @@ export default function ReportsPage() {
     const categories = cats || [];
     setCategoryNames(categories.map((c) => c.name));
 
-    // Fetch students in class
-    const { data: students } = await supabase
+    // Fetch students in class (or single student)
+    let studentsQuery = supabase
       .from("students")
       .select("id, full_name")
       .eq("class_id", selectedClass)
       .order("full_name");
 
-    if (!students || students.length === 0) {
+    if (selectedStudent !== "all") {
+      studentsQuery = studentsQuery.eq("id", selectedStudent);
+    }
+
+    const { data: studentsData } = await studentsQuery;
+    const filteredStudents = studentsData || [];
+
+    if (!filteredStudents || filteredStudents.length === 0) {
       setGradeData([]);
       setLoadingGrades(false);
       return;
     }
 
     // Fetch grades filtered by date range
-    const studentIds = students.map((s) => s.id);
+    const studentIds = filteredStudents.map((s) => s.id);
     let gradesQuery = supabase
       .from("grades")
       .select("student_id, category_id, score, created_at")
@@ -188,7 +224,7 @@ export default function ReportsPage() {
       gradeMap[g.student_id][g.category_id] = g.score;
     });
 
-    const rows: GradeRow[] = students.map((s) => {
+    const rows: GradeRow[] = filteredStudents.map((s) => {
       const catScores: Record<string, number | null> = {};
       let total = 0;
       categories.forEach((cat) => {
@@ -296,19 +332,69 @@ export default function ReportsPage() {
     doc.save("grades_report.pdf");
   };
 
+  // ============ Print & Send ============
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleSendSMS = async () => {
+    if (selectedStudent === "all") {
+      toast({ title: "تنبيه", description: "اختر طالب محدد لإرسال التقرير لولي أمره", variant: "destructive" });
+      return;
+    }
+    const student = students.find((s) => s.id === selectedStudent);
+    if (!student?.parent_phone) {
+      toast({ title: "تنبيه", description: "لا يوجد رقم هاتف لولي أمر هذا الطالب", variant: "destructive" });
+      return;
+    }
+
+    setSendingSMS(true);
+    const message = `تقرير الطالب: ${student.full_name}\nالفترة: ${dateFrom} - ${dateTo}\nحاضر: ${attendanceSummary.present} | غائب: ${attendanceSummary.absent} | متأخر: ${attendanceSummary.late}`;
+
+    const { data, error } = await supabase.functions.invoke("send-sms", {
+      body: { phone: student.parent_phone, message },
+    });
+
+    if (error || !data?.success) {
+      toast({ title: "خطأ", description: "فشل إرسال الرسالة", variant: "destructive" });
+    } else {
+      toast({ title: "تم", description: "تم إرسال التقرير لولي الأمر بنجاح" });
+    }
+    setSendingSMS(false);
+  };
+
   // ============ Render ============
 
   const className = classes.find((c) => c.id === selectedClass)?.name || "";
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold">التقارير والإحصائيات</h1>
-        <p className="text-muted-foreground">تقارير يومية وفترية للحضور والدرجات مع إمكانية التصدير</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">التقارير والإحصائيات</h1>
+          <p className="text-muted-foreground">تقارير يومية وفترية للحضور والدرجات مع إمكانية التصدير</p>
+        </div>
+        <div className="flex items-center gap-2 print:hidden">
+          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
+            <Printer className="h-4 w-4" />
+            طباعة
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSendSMS}
+            disabled={sendingSMS || selectedStudent === "all"}
+            className="gap-1.5"
+          >
+            <Send className="h-4 w-4" />
+            {sendingSMS ? "جارٍ الإرسال..." : "إرسال لولي الأمر"}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
-      <Card className="shadow-card">
+      <Card className="shadow-card print:shadow-none">
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1.5 min-w-[180px]">
@@ -321,6 +407,22 @@ export default function ReportsPage() {
                   {classes.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>
                       {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 min-w-[180px]">
+              <Label className="text-xs">الطالب</Label>
+              <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+                <SelectTrigger>
+                  <SelectValue placeholder="جميع الطلاب" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">جميع الطلاب</SelectItem>
+                  {students.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.full_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -567,7 +669,7 @@ export default function ReportsPage() {
 
         {/* ===== Behavior Report ===== */}
         <TabsContent value="behavior" className="space-y-4">
-          <BehaviorReport selectedClass={selectedClass} dateFrom={dateFrom} dateTo={dateTo} />
+          <BehaviorReport selectedClass={selectedClass} dateFrom={dateFrom} dateTo={dateTo} selectedStudent={selectedStudent} />
         </TabsContent>
       </Tabs>
     </div>
