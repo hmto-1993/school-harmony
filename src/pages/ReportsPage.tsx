@@ -165,12 +165,16 @@ export default function ReportsPage() {
       return;
     }
 
-    // Fetch grades
+    // Fetch grades filtered by date range
     const studentIds = students.map((s) => s.id);
-    const { data: grades } = await supabase
+    let gradesQuery = supabase
       .from("grades")
-      .select("student_id, category_id, score")
-      .in("student_id", studentIds);
+      .select("student_id, category_id, score, created_at")
+      .in("student_id", studentIds)
+      .gte("created_at", `${dateFrom}T00:00:00`)
+      .lte("created_at", `${dateTo}T23:59:59`);
+
+    const { data: grades } = await gradesQuery;
 
     // Build lookup
     const gradeMap: Record<string, Record<string, number | null>> = {};
@@ -295,7 +299,7 @@ export default function ReportsPage() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold">التقارير والإحصائيات</h1>
-        <p className="text-muted-foreground">تقارير الحضور والدرجات مع إمكانية التصدير</p>
+        <p className="text-muted-foreground">تقارير يومية وفترية للحضور والدرجات مع إمكانية التصدير</p>
       </div>
 
       {/* Filters */}
@@ -318,23 +322,44 @@ export default function ReportsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">من تاريخ</Label>
+              <Label className="text-xs">نوع التقرير</Label>
+              <Select value={dateFrom === dateTo ? "daily" : "periodic"} onValueChange={(v) => {
+                if (v === "daily") {
+                  setDateTo(dateFrom);
+                }
+              }}>
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">يومي</SelectItem>
+                  <SelectItem value="periodic">فتري</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{dateFrom === dateTo ? "التاريخ" : "من تاريخ"}</Label>
               <Input
                 type="date"
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  if (dateFrom === dateTo) setDateTo(e.target.value);
+                }}
                 className="w-40"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">إلى تاريخ</Label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-40"
-              />
-            </div>
+            {dateFrom !== dateTo && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">إلى تاريخ</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
