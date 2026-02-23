@@ -123,9 +123,12 @@ export default function SettingsPage() {
   const [newGrade, setNewGrade] = useState("الأول الثانوي");
   const [newYear, setNewYear] = useState("1446-1447");
 
-  // Edit class name
+  // Edit class inline
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [editingClassName, setEditingClassName] = useState("");
+  const [editingClassGrade, setEditingClassGrade] = useState("");
+  const [editingClassSection, setEditingClassSection] = useState("");
+  const [editingClassYear, setEditingClassYear] = useState("");
 
   // Import classes from Excel
   const [importClassesOpen, setImportClassesOpen] = useState(false);
@@ -354,16 +357,29 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRenameClass = async (id: string) => {
+  const handleSaveClassEdit = async (id: string) => {
     if (!editingClassName.trim()) return;
-    const { error } = await supabase.from("classes").update({ name: editingClassName }).eq("id", id);
+    const { error } = await supabase.from("classes").update({
+      name: editingClassName,
+      grade: editingClassGrade,
+      section: editingClassSection,
+      academic_year: editingClassYear,
+    }).eq("id", id);
     if (error) {
       toast({ title: "خطأ", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "تم التعديل", description: "تم تعديل اسم الشعبة" });
+      toast({ title: "تم التعديل", description: "تم تعديل بيانات الشعبة" });
       setEditingClassId(null);
       fetchData();
     }
+  };
+
+  const startEditingClass = (cls: ClassRow) => {
+    setEditingClassId(cls.id);
+    setEditingClassName(cls.name);
+    setEditingClassGrade(cls.grade);
+    setEditingClassSection(cls.section);
+    setEditingClassYear(cls.academic_year);
   };
 
   const handleClassFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -757,69 +773,71 @@ export default function SettingsPage() {
                     <TableRow key={cls.id}>
                       <TableCell className="font-medium">
                         {isAdmin && editingClassId === cls.id ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              value={editingClassName}
-                              onChange={(e) => setEditingClassName(e.target.value)}
-                              className="h-8 w-40"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleRenameClass(cls.id);
-                                if (e.key === "Escape") setEditingClassId(null);
-                              }}
-                            />
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRenameClass(cls.id)}>
-                              <Check className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingClassId(null)}>
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          <Input value={editingClassName} onChange={(e) => setEditingClassName(e.target.value)} className="h-8 w-32"
+                            autoFocus onKeyDown={(e) => { if (e.key === "Enter") handleSaveClassEdit(cls.id); if (e.key === "Escape") setEditingClassId(null); }} />
                         ) : (
-                          <span
-                            className={isAdmin ? "cursor-pointer hover:underline" : ""}
-                            onClick={() => {
-                              if (isAdmin) {
-                                setEditingClassId(cls.id);
-                                setEditingClassName(cls.name);
-                              }
-                            }}
-                          >
+                          <span className={isAdmin ? "cursor-pointer hover:underline" : ""} onClick={() => isAdmin && startEditingClass(cls)}>
                             {cls.name}
                             {isAdmin && <Pencil className="inline h-3 w-3 mr-1 text-muted-foreground" />}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>{cls.grade}</TableCell>
-                      <TableCell>{cls.section}</TableCell>
-                      <TableCell>{cls.academic_year}</TableCell>
+                      <TableCell>
+                        {isAdmin && editingClassId === cls.id ? (
+                          <Input value={editingClassGrade} onChange={(e) => setEditingClassGrade(e.target.value)} className="h-8 w-28"
+                            onKeyDown={(e) => { if (e.key === "Enter") handleSaveClassEdit(cls.id); if (e.key === "Escape") setEditingClassId(null); }} />
+                        ) : cls.grade}
+                      </TableCell>
+                      <TableCell>
+                        {isAdmin && editingClassId === cls.id ? (
+                          <Input value={editingClassSection} onChange={(e) => setEditingClassSection(e.target.value)} className="h-8 w-16"
+                            onKeyDown={(e) => { if (e.key === "Enter") handleSaveClassEdit(cls.id); if (e.key === "Escape") setEditingClassId(null); }} />
+                        ) : cls.section}
+                      </TableCell>
+                      <TableCell>
+                        {isAdmin && editingClassId === cls.id ? (
+                          <Input value={editingClassYear} onChange={(e) => setEditingClassYear(e.target.value)} className="h-8 w-24"
+                            onKeyDown={(e) => { if (e.key === "Enter") handleSaveClassEdit(cls.id); if (e.key === "Escape") setEditingClassId(null); }} />
+                        ) : cls.academic_year}
+                      </TableCell>
                       <TableCell>{cls.studentCount}</TableCell>
                       {isAdmin && (
-                        <TableCell>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
+                        <TableCell className="flex items-center gap-1">
+                          {editingClassId === cls.id ? (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSaveClassEdit(cls.id)}>
+                                <Check className="h-3.5 w-3.5" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent dir="rtl">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>حذف الشعبة {cls.name}؟</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  سيتم حذف الشعبة وجميع البيانات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  onClick={() => handleDeleteClass(cls.id)}
-                                >
-                                  حذف
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingClassId(null)}>
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent dir="rtl">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>حذف الشعبة {cls.name}؟</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    سيتم حذف الشعبة وجميع البيانات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => handleDeleteClass(cls.id)}
+                                  >
+                                    حذف
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </TableCell>
                       )}
                     </TableRow>
