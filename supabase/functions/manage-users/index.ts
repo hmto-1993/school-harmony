@@ -110,6 +110,73 @@ serve(async (req) => {
       );
     }
 
+    if (action === "change_password") {
+      if (!email || !password) {
+        return new Response(
+          JSON.stringify({ error: "البريد الإلكتروني وكلمة المرور مطلوبان" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Find user by email
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      if (listError) throw listError;
+
+      const targetUser = users.find((u) => u.email === email);
+      if (!targetUser) {
+        return new Response(
+          JSON.stringify({ error: "المستخدم غير موجود" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetUser.id,
+        { password }
+      );
+      if (updateError) throw updateError;
+
+      return new Response(
+        JSON.stringify({ success: true, message: "تم تغيير كلمة المرور بنجاح" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "list_teachers") {
+      const { data: roles } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "teacher");
+
+      if (!roles || roles.length === 0) {
+        return new Response(
+          JSON.stringify({ teachers: [] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const teacherIds = roles.map((r) => r.user_id);
+      const { data: profiles } = await supabaseAdmin
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", teacherIds);
+
+      // Get emails
+      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+      const teacherUsers = users.filter((u) => teacherIds.includes(u.id));
+
+      const teachers = teacherUsers.map((u) => ({
+        user_id: u.id,
+        email: u.email,
+        full_name: profiles?.find((p) => p.user_id === u.id)?.full_name || u.email,
+      }));
+
+      return new Response(
+        JSON.stringify({ teachers }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: "Invalid action" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

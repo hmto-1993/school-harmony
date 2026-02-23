@@ -23,6 +23,7 @@ import {
   Users,
   Eye,
   UserCircle,
+  KeyRound,
 } from "lucide-react";
 import {
   Dialog,
@@ -82,6 +83,12 @@ export default function SettingsPage() {
   const [profilePhone, setProfilePhone] = useState("");
   const [profileNationalId, setProfileNationalId] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // Teacher password management
+  const [teachers, setTeachers] = useState<{ user_id: string; email: string; full_name: string }[]>([]);
+  const [selectedTeacher, setSelectedTeacher] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [categories, setCategories] = useState<GradeCategory[]>([]);
@@ -147,6 +154,16 @@ export default function SettingsPage() {
       }
     }
 
+    // Fetch teachers list for admin
+    if (user && isAdmin) {
+      const { data: teachersData } = await supabase.functions.invoke("manage-users", {
+        body: { action: "list_teachers" },
+      });
+      if (teachersData?.teachers) {
+        setTeachers(teachersData.teachers);
+      }
+    }
+
     setLoading(false);
   };
 
@@ -170,6 +187,26 @@ export default function SettingsPage() {
       toast({ title: "خطأ", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "تم الحفظ", description: "تم تحديث الملف الشخصي بنجاح" });
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!selectedTeacher || !newPassword.trim()) return;
+    const teacher = teachers.find((t) => t.user_id === selectedTeacher);
+    if (!teacher) return;
+
+    setChangingPassword(true);
+    const { data, error } = await supabase.functions.invoke("manage-users", {
+      body: { action: "change_password", email: teacher.email, password: newPassword },
+    });
+    setChangingPassword(false);
+
+    if (error || data?.error) {
+      toast({ title: "خطأ", description: data?.error || "فشل في تغيير كلمة المرور", variant: "destructive" });
+    } else {
+      toast({ title: "تم التغيير", description: `تم تغيير كلمة المرور لـ ${teacher.full_name}` });
+      setNewPassword("");
+      setSelectedTeacher("");
     }
   };
 
@@ -299,6 +336,12 @@ export default function SettingsPage() {
             <UserCircle className="h-4 w-4" />
             الملف الشخصي
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="passwords" className="gap-1.5">
+              <KeyRound className="h-4 w-4" />
+              كلمات المرور
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* ===== الشعب ===== */}
@@ -652,6 +695,51 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* ===== كلمات المرور ===== */}
+        {isAdmin && (
+          <TabsContent value="passwords">
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg">تغيير كلمة مرور المعلم</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-md">
+                <div className="space-y-2">
+                  <Label>اختر المعلم</Label>
+                  <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر المعلم" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers.map((t) => (
+                        <SelectItem key={t.user_id} value={t.user_id}>
+                          {t.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>كلمة المرور الجديدة</Label>
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="أدخل كلمة المرور الجديدة"
+                    dir="ltr"
+                  />
+                </div>
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={changingPassword || !selectedTeacher || !newPassword.trim()}
+                  className="gap-1.5"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  {changingPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
