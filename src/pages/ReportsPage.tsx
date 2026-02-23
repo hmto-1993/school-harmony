@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import AttendanceChart from "@/components/reports/AttendanceChart";
+import GradesChart from "@/components/reports/GradesChart";
 
 // ============ Types ============
 
@@ -429,6 +431,9 @@ export default function ReportsPage() {
                 </Card>
               </div>
 
+              {/* Attendance Chart */}
+              <AttendanceChart data={attendanceData} />
+
               {/* Data Table */}
               <Card className="shadow-card">
                 <CardContent className="pt-4">
@@ -505,7 +510,11 @@ export default function ReportsPage() {
           </div>
 
           {gradeData.length > 0 && (
-            <Card className="shadow-card">
+            <>
+              {/* Grades Chart */}
+              <GradesChart data={gradeData} categoryNames={categoryNames} />
+
+              <Card className="shadow-card">
               <CardContent className="pt-4">
                 <div className="max-h-[400px] overflow-auto">
                   <Table>
@@ -537,6 +546,7 @@ export default function ReportsPage() {
                 </div>
               </CardContent>
             </Card>
+            </>
           )}
 
           {!loadingGrades && gradeData.length === 0 && (
