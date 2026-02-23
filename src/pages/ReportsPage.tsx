@@ -70,6 +70,7 @@ export default function ReportsPage() {
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [dateFrom, setDateFrom] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [reportType, setReportType] = useState<"daily" | "periodic">("daily");
 
   // Attendance data
   const [attendanceData, setAttendanceData] = useState<AttendanceRow[]>([]);
@@ -323,7 +324,8 @@ export default function ReportsPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">نوع التقرير</Label>
-              <Select value={dateFrom === dateTo ? "daily" : "periodic"} onValueChange={(v) => {
+              <Select value={reportType} onValueChange={(v: "daily" | "periodic") => {
+                setReportType(v);
                 if (v === "daily") {
                   setDateTo(dateFrom);
                 }
@@ -338,18 +340,18 @@ export default function ReportsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{dateFrom === dateTo ? "التاريخ" : "من تاريخ"}</Label>
+              <Label className="text-xs">{reportType === "daily" ? "التاريخ" : "من تاريخ"}</Label>
               <Input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => {
                   setDateFrom(e.target.value);
-                  if (dateFrom === dateTo) setDateTo(e.target.value);
+                  if (reportType === "daily") setDateTo(e.target.value);
                 }}
                 className="w-40"
               />
             </div>
-            {dateFrom !== dateTo && (
+            {reportType === "periodic" && (
               <div className="space-y-1.5">
                 <Label className="text-xs">إلى تاريخ</Label>
                 <Input
