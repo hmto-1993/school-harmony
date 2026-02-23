@@ -352,59 +352,130 @@ export default function SettingsPage() {
 
   const handleSaveCategories = async () => {
     setSavingCats(true);
-    const updates = Object.entries(editingCats).map(([id, vals]) =>
-      supabase
-        .from("grade_categories")
-        .update({ weight: vals.weight, max_score: vals.max_score })
-        .eq("id", id)
-    );
-    const results = await Promise.all(updates);
-    const hasError = results.some((r) => r.error);
-    if (hasError) {
-      toast({ title: "خطأ في الحفظ", variant: "destructive" });
+    let hasError = false;
+
+    if (catClassFilter === "all") {
+      const firstClassId = classes[0]?.id;
+      const templateCats = categories.filter((c) => c.class_id === firstClassId);
+
+      for (const tpl of templateCats) {
+        const editedVals = editingCats[tpl.id];
+        if (!editedVals) continue;
+        const matchingIds = categories
+          .filter((c) => c.name === tpl.name)
+          .map((c) => c.id);
+        for (const id of matchingIds) {
+          const { error } = await supabase
+            .from("grade_categories")
+            .update({ weight: editedVals.weight, max_score: editedVals.max_score })
+            .eq("id", id);
+          if (error) hasError = true;
+        }
+      }
+      if (hasError) {
+        toast({ title: "خطأ في الحفظ", variant: "destructive" });
+      } else {
+        toast({ title: "تم الحفظ", description: "تم تعميم أوزان التقييم على جميع الشعب" });
+        fetchData();
+      }
     } else {
-      toast({ title: "تم الحفظ", description: "تم تحديث أوزان التقييم بنجاح" });
-      fetchData();
+      // Save only the filtered class
+      const filtered = categories.filter((c) => c.class_id === catClassFilter);
+      const updates = filtered.map((cat) =>
+        supabase
+          .from("grade_categories")
+          .update({ weight: editingCats[cat.id]?.weight ?? cat.weight, max_score: editingCats[cat.id]?.max_score ?? cat.max_score })
+          .eq("id", cat.id)
+      );
+      const results = await Promise.all(updates);
+      const hasError = results.some((r) => r.error);
+      if (hasError) {
+        toast({ title: "خطأ في الحفظ", variant: "destructive" });
+      } else {
+        toast({ title: "تم الحفظ", description: "تم تحديث أوزان التقييم بنجاح" });
+        fetchData();
+      }
     }
     setSavingCats(false);
   };
 
   const handleAddCategory = async () => {
     if (!newCatName.trim() || !newCatClassId) return;
-    const classCats = categories.filter((c) => c.class_id === newCatClassId);
-    const maxOrder = classCats.length > 0 ? Math.max(...classCats.map((c) => c.sort_order)) : 0;
-    const { error } = await supabase.from("grade_categories").insert({
-      name: newCatName,
-      weight: newCatWeight,
-      max_score: newCatMaxScore,
-      class_id: newCatClassId,
-      sort_order: maxOrder + 1,
-    });
-    if (error) {
-      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+
+    if (newCatClassId === "all") {
+      // Add to ALL classes
+      const inserts = classes.map((cls) => {
+        const classCats = categories.filter((c) => c.class_id === cls.id);
+        const maxOrder = classCats.length > 0 ? Math.max(...classCats.map((c) => c.sort_order)) : 0;
+        return supabase.from("grade_categories").insert({
+          name: newCatName,
+          weight: newCatWeight,
+          max_score: newCatMaxScore,
+          class_id: cls.id,
+          sort_order: maxOrder + 1,
+        });
+      });
+      const results = await Promise.all(inserts);
+      const hasError = results.some((r) => r.error);
+      if (hasError) {
+        toast({ title: "خطأ", description: "فشل في الإضافة لبعض الشعب", variant: "destructive" });
+      } else {
+        toast({ title: "تمت الإضافة", description: `تمت إضافة فئة "${newCatName}" لجميع الشعب` });
+      }
     } else {
-      toast({ title: "تمت الإضافة", description: `تمت إضافة فئة "${newCatName}"` });
-      setNewCatName("");
-      setNewCatWeight(10);
-      setNewCatMaxScore(100);
-      fetchData();
+      const classCats = categories.filter((c) => c.class_id === newCatClassId);
+      const maxOrder = classCats.length > 0 ? Math.max(...classCats.map((c) => c.sort_order)) : 0;
+      const { error } = await supabase.from("grade_categories").insert({
+        name: newCatName,
+        weight: newCatWeight,
+        max_score: newCatMaxScore,
+        class_id: newCatClassId,
+        sort_order: maxOrder + 1,
+      });
+      if (error) {
+        toast({ title: "خطأ", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "تمت الإضافة", description: `تمت إضافة فئة "${newCatName}"` });
+      }
     }
+    setNewCatName("");
+    setNewCatWeight(10);
+    setNewCatMaxScore(100);
+    fetchData();
   };
 
   const handleDeleteCategory = async (id: string) => {
-    const { error } = await supabase.from("grade_categories").delete().eq("id", id);
-    if (error) {
-      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    const cat = categories.find((c) => c.id === id);
+    if (catClassFilter === "all" && cat) {
+      // Delete matching category name from ALL classes
+      const matchingIds = categories.filter((c) => c.name === cat.name).map((c) => c.id);
+      const deletes = matchingIds.map((mid) => supabase.from("grade_categories").delete().eq("id", mid));
+      const results = await Promise.all(deletes);
+      const hasError = results.some((r) => r.error);
+      if (hasError) {
+        toast({ title: "خطأ", description: "فشل حذف بعض الفئات", variant: "destructive" });
+      } else {
+        toast({ title: "تم الحذف", description: `تم حذف "${cat.name}" من جميع الشعب` });
+      }
     } else {
-      toast({ title: "تم الحذف" });
-      fetchData();
+      const { error } = await supabase.from("grade_categories").delete().eq("id", id);
+      if (error) {
+        toast({ title: "خطأ", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "تم الحذف" });
+      }
     }
+    fetchData();
   };
 
   // Filter categories by selected class
   const [catClassFilter, setCatClassFilter] = useState("all");
+  // When "all", show unique categories by name (from first class as template)
   const filteredCategories = catClassFilter === "all"
-    ? categories
+    ? (() => {
+        const firstClassId = classes[0]?.id;
+        return firstClassId ? categories.filter((c) => c.class_id === firstClassId) : [];
+      })()
     : categories.filter((c) => c.class_id === catClassFilter);
 
   if (loading) {
@@ -601,6 +672,7 @@ export default function SettingsPage() {
                               <SelectValue placeholder="اختر الشعبة" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="all">جميع الشعب</SelectItem>
                               {classes.map((cls) => (
                                 <SelectItem key={cls.id} value={cls.id}>
                                   {cls.name}
@@ -655,7 +727,7 @@ export default function SettingsPage() {
                     disabled={savingCats}
                   >
                     <Save className="h-4 w-4" />
-                    {savingCats ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+                    {savingCats ? "جارٍ الحفظ..." : catClassFilter === "all" ? "تعميم على الكل" : "حفظ التغييرات"}
                   </Button>
                 </div>
               )}
@@ -668,7 +740,7 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">جميع الشعب</SelectItem>
+                    <SelectItem value="all">تعميم على الكل</SelectItem>
                     {classes.map((cls) => (
                       <SelectItem key={cls.id} value={cls.id}>
                         {cls.name}
@@ -682,7 +754,7 @@ export default function SettingsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-right">الفئة</TableHead>
-                    {catClassFilter === "all" && <TableHead className="text-right">الشعبة</TableHead>}
+                    
                     <TableHead className="text-right">الوزن (%)</TableHead>
                     <TableHead className="text-right">الدرجة القصوى</TableHead>
                     {isAdmin && <TableHead className="text-right">إجراءات</TableHead>}
@@ -692,7 +764,7 @@ export default function SettingsPage() {
                   {filteredCategories.map((cat) => (
                     <TableRow key={cat.id}>
                       <TableCell className="font-medium">{cat.name}</TableCell>
-                      {catClassFilter === "all" && <TableCell>{cat.class_name}</TableCell>}
+                      
                       <TableCell>
                         {isAdmin ? (
                           <Input
