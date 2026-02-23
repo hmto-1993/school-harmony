@@ -53,11 +53,15 @@ const isNumericCategory = (name: string) => NUMERIC_CATEGORIES.includes(name);
 const isParticipation = (name: string) => name === "المشاركة";
 const MAX_PARTICIPATION_SLOTS = 3;
 
-export default function DailyGradeEntry() {
+interface DailyGradeEntryProps {
+  selectedClass: string;
+  onClassChange: (classId: string) => void;
+}
+
+export default function DailyGradeEntry({ selectedClass, onClassChange }: DailyGradeEntryProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-  const [selectedClass, setSelectedClass] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [categories, setCategories] = useState<GradeCategory[]>([]);
   const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
@@ -216,7 +220,7 @@ export default function DailyGradeEntry() {
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <CardTitle className="text-lg">إدخال الدرجات اليومية</CardTitle>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <Select value={selectedClass} onValueChange={onClassChange}>
               <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="اختر الشعبة..." /></SelectTrigger>
               <SelectContent>
                 {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}

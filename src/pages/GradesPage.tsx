@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardList, BarChart3, UserCheck } from "lucide-react";
 import DailyGradeEntry from "@/components/grades/DailyGradeEntry";
@@ -5,6 +6,8 @@ import GradesSummary from "@/components/grades/GradesSummary";
 import BehaviorEntry from "@/components/grades/BehaviorEntry";
 
 export default function GradesPage() {
+  const [selectedClass, setSelectedClass] = useState("");
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -29,11 +32,11 @@ export default function GradesPage() {
         </TabsList>
 
         <TabsContent value="daily">
-          <DailyGradeEntry />
+          <DailyGradeEntry selectedClass={selectedClass} onClassChange={setSelectedClass} />
         </TabsContent>
 
         <TabsContent value="behavior">
-          <BehaviorEntry />
+          <BehaviorEntry selectedClass={selectedClass} onClassChange={setSelectedClass} />
         </TabsContent>
 
         <TabsContent value="summary">

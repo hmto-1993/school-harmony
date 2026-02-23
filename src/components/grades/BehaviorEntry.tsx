@@ -37,11 +37,15 @@ const typeLabel = (type: BehaviorType) => {
   return "—";
 };
 
-export default function BehaviorEntry() {
+interface BehaviorEntryProps {
+  selectedClass: string;
+  onClassChange: (classId: string) => void;
+}
+
+export default function BehaviorEntry({ selectedClass, onClassChange }: BehaviorEntryProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-  const [selectedClass, setSelectedClass] = useState("");
   const [students, setStudents] = useState<StudentBehavior[]>([]);
   const [saving, setSaving] = useState(false);
   const [noteDialog, setNoteDialog] = useState<{ open: boolean; studentId: string; name: string }>({ open: false, studentId: "", name: "" });
@@ -169,7 +173,7 @@ export default function BehaviorEntry() {
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <CardTitle className="text-lg">سجل السلوك اليومي</CardTitle>
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <Select value={selectedClass} onValueChange={onClassChange}>
               <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="اختر الشعبة..." /></SelectTrigger>
               <SelectContent>
                 {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
