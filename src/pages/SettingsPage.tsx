@@ -401,13 +401,11 @@ export default function SettingsPage() {
     }
   };
 
-  // Group categories by class
-  const catsByClass = categories.reduce<Record<string, { classId: string; cats: GradeCategory[] }>>((acc, cat) => {
-    const key = cat.class_name || "—";
-    if (!acc[key]) acc[key] = { classId: cat.class_id || "", cats: [] };
-    acc[key].cats.push(cat);
-    return acc;
-  }, {});
+  // Filter categories by selected class
+  const [catClassFilter, setCatClassFilter] = useState("all");
+  const filteredCategories = catClassFilter === "all"
+    ? categories
+    : categories.filter((c) => c.class_id === catClassFilter);
 
   if (loading) {
     return (
@@ -662,112 +660,126 @@ export default function SettingsPage() {
                 </div>
               )}
             </CardHeader>
-            <CardContent className="space-y-6">
-              {Object.entries(catsByClass).map(([className, { cats }]) => (
-                <div key={className}>
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-2">
-                    الشعبة: {className}
-                  </h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">الفئة</TableHead>
-                        <TableHead className="text-right">الوزن (%)</TableHead>
-                        <TableHead className="text-right">الدرجة القصوى</TableHead>
-                        {isAdmin && <TableHead className="text-right">إجراءات</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {cats.map((cat) => (
-                        <TableRow key={cat.id}>
-                          <TableCell className="font-medium">{cat.name}</TableCell>
-                          <TableCell>
-                            {isAdmin ? (
-                              <Input
-                                type="number"
-                                className="w-24"
-                                value={editingCats[cat.id]?.weight ?? cat.weight}
-                                onChange={(e) =>
-                                  setEditingCats((prev) => ({
-                                    ...prev,
-                                    [cat.id]: {
-                                      ...prev[cat.id],
-                                      weight: parseFloat(e.target.value) || 0,
-                                    },
-                                  }))
-                                }
-                              />
-                            ) : (
-                              <span>{cat.weight}%</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isAdmin ? (
-                              <Input
-                                type="number"
-                                className="w-24"
-                                value={editingCats[cat.id]?.max_score ?? cat.max_score}
-                                onChange={(e) =>
-                                  setEditingCats((prev) => ({
-                                    ...prev,
-                                    [cat.id]: {
-                                      ...prev[cat.id],
-                                      max_score: parseFloat(e.target.value) || 0,
-                                    },
-                                  }))
-                                }
-                              />
-                            ) : (
-                              <span>{cat.max_score}</span>
-                            )}
-                          </TableCell>
-                          {isAdmin && (
-                            <TableCell>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent dir="rtl">
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>حذف فئة "{cat.name}"؟</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      سيتم حذف هذه الفئة وجميع الدرجات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      onClick={() => handleDeleteCategory(cat.id)}
-                                    >
-                                      حذف
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {/* Total weight indicator */}
-                  <div className="mt-1 text-xs text-muted-foreground text-left">
-                    مجموع الأوزان:{" "}
-                    <span
-                      className={
-                        cats.reduce((sum, c) => sum + (editingCats[c.id]?.weight ?? c.weight), 0) === 100
-                          ? "text-green-600 font-bold"
-                          : "text-destructive font-bold"
-                      }
-                    >
-                      {cats.reduce((sum, c) => sum + (editingCats[c.id]?.weight ?? c.weight), 0)}%
-                    </span>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Label className="whitespace-nowrap">الشعبة:</Label>
+                <Select value={catClassFilter} onValueChange={setCatClassFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">جميع الشعب</SelectItem>
+                    {classes.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">الفئة</TableHead>
+                    {catClassFilter === "all" && <TableHead className="text-right">الشعبة</TableHead>}
+                    <TableHead className="text-right">الوزن (%)</TableHead>
+                    <TableHead className="text-right">الدرجة القصوى</TableHead>
+                    {isAdmin && <TableHead className="text-right">إجراءات</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCategories.map((cat) => (
+                    <TableRow key={cat.id}>
+                      <TableCell className="font-medium">{cat.name}</TableCell>
+                      {catClassFilter === "all" && <TableCell>{cat.class_name}</TableCell>}
+                      <TableCell>
+                        {isAdmin ? (
+                          <Input
+                            type="number"
+                            className="w-24"
+                            value={editingCats[cat.id]?.weight ?? cat.weight}
+                            onChange={(e) =>
+                              setEditingCats((prev) => ({
+                                ...prev,
+                                [cat.id]: {
+                                  ...prev[cat.id],
+                                  weight: parseFloat(e.target.value) || 0,
+                                },
+                              }))
+                            }
+                          />
+                        ) : (
+                          <span>{cat.weight}%</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isAdmin ? (
+                          <Input
+                            type="number"
+                            className="w-24"
+                            value={editingCats[cat.id]?.max_score ?? cat.max_score}
+                            onChange={(e) =>
+                              setEditingCats((prev) => ({
+                                ...prev,
+                                [cat.id]: {
+                                  ...prev[cat.id],
+                                  max_score: parseFloat(e.target.value) || 0,
+                                },
+                              }))
+                            }
+                          />
+                        ) : (
+                          <span>{cat.max_score}</span>
+                        )}
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent dir="rtl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>حذف فئة "{cat.name}"؟</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  سيتم حذف هذه الفئة وجميع الدرجات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => handleDeleteCategory(cat.id)}
+                                >
+                                  حذف
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {/* Total weight per class */}
+              {catClassFilter !== "all" && (
+                <div className="text-xs text-muted-foreground text-left">
+                  مجموع الأوزان:{" "}
+                  <span
+                    className={
+                      filteredCategories.reduce((sum, c) => sum + (editingCats[c.id]?.weight ?? c.weight), 0) === 100
+                        ? "text-green-600 font-bold"
+                        : "text-destructive font-bold"
+                    }
+                  >
+                    {filteredCategories.reduce((sum, c) => sum + (editingCats[c.id]?.weight ?? c.weight), 0)}%
+                  </span>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </TabsContent>
