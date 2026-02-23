@@ -370,12 +370,12 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 print:hidden">
         <div>
           <h1 className="text-2xl font-bold">التقارير والإحصائيات</h1>
           <p className="text-muted-foreground">تقارير يومية وفترية للحضور والدرجات مع إمكانية التصدير</p>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
+        <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
             <Printer className="h-4 w-4" />
             طباعة
@@ -394,7 +394,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Filters */}
-      <Card className="shadow-card print:shadow-none">
+      <Card className="shadow-card print:hidden">
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1.5 min-w-[180px]">
@@ -473,7 +473,7 @@ export default function ReportsPage() {
       </Card>
 
       <Tabs defaultValue="attendance" dir="rtl">
-        <TabsList className="w-full justify-start">
+        <TabsList className="w-full justify-start print:hidden">
           <TabsTrigger value="attendance" className="gap-1.5">
             <ClipboardCheck className="h-4 w-4" />
             تقرير الحضور
