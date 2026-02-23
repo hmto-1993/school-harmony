@@ -1,7 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, BarChart3 } from "lucide-react";
+import { ClipboardList, BarChart3, UserCheck } from "lucide-react";
 import DailyGradeEntry from "@/components/grades/DailyGradeEntry";
 import GradesSummary from "@/components/grades/GradesSummary";
+import BehaviorEntry from "@/components/grades/BehaviorEntry";
 
 export default function GradesPage() {
   return (
@@ -17,6 +18,10 @@ export default function GradesPage() {
             <ClipboardList className="h-4 w-4" />
             إدخال يومي
           </TabsTrigger>
+          <TabsTrigger value="behavior" className="gap-2">
+            <UserCheck className="h-4 w-4" />
+            السلوك
+          </TabsTrigger>
           <TabsTrigger value="summary" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             خلاصة التقييمات
@@ -25,6 +30,10 @@ export default function GradesPage() {
 
         <TabsContent value="daily">
           <DailyGradeEntry />
+        </TabsContent>
+
+        <TabsContent value="behavior">
+          <BehaviorEntry />
         </TabsContent>
 
         <TabsContent value="summary">
