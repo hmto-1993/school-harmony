@@ -22,6 +22,7 @@ import {
   GraduationCap,
   Users,
   Eye,
+  UserCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -73,8 +74,14 @@ interface GradeCategory {
 }
 
 export default function SettingsPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const isAdmin = role === "admin";
+
+  // Profile state
+  const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileNationalId, setProfileNationalId] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [categories, setCategories] = useState<GradeCategory[]>([]);
@@ -126,12 +133,45 @@ export default function SettingsPage() {
     });
     setEditingCats(edits);
 
+    // Fetch profile
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, phone, national_id")
+        .eq("user_id", user.id)
+        .single();
+      if (profile) {
+        setProfileName(profile.full_name || "");
+        setProfilePhone(profile.phone || "");
+        setProfileNationalId(profile.national_id || "");
+      }
+    }
+
     setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setSavingProfile(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: profileName,
+        phone: profilePhone,
+        national_id: profileNationalId || null,
+      })
+      .eq("user_id", user.id);
+    setSavingProfile(false);
+    if (error) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تم الحفظ", description: "تم تحديث الملف الشخصي بنجاح" });
+    }
+  };
 
   const handleAddClass = async () => {
     if (!newClassName.trim() || !newSection.trim()) return;
@@ -254,6 +294,10 @@ export default function SettingsPage() {
           <TabsTrigger value="categories" className="gap-1.5">
             <GraduationCap className="h-4 w-4" />
             فئات التقييم
+          </TabsTrigger>
+          <TabsTrigger value="profile" className="gap-1.5">
+            <UserCircle className="h-4 w-4" />
+            الملف الشخصي
           </TabsTrigger>
         </TabsList>
 
@@ -559,6 +603,52 @@ export default function SettingsPage() {
                   </div>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* ===== الملف الشخصي ===== */}
+        <TabsContent value="profile">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-lg">الملف الشخصي</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-md">
+              <div className="space-y-2">
+                <Label>الاسم الكامل</Label>
+                <Input
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="الاسم الكامل"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>رقم الجوال</Label>
+                <Input
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                  placeholder="05XXXXXXXX"
+                  dir="ltr"
+                  className="text-right"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>رقم الهوية الوطنية</Label>
+                <Input
+                  value={profileNationalId}
+                  onChange={(e) => setProfileNationalId(e.target.value)}
+                  placeholder="1XXXXXXXXX"
+                  dir="ltr"
+                  className="text-right"
+                  inputMode="numeric"
+                />
+                <p className="text-xs text-muted-foreground">
+                  يُستخدم لتسجيل الدخول بدلاً من البريد الإلكتروني
+                </p>
+              </div>
+              <Button onClick={handleSaveProfile} disabled={savingProfile} className="gap-1.5">
+                <Save className="h-4 w-4" />
+                {savingProfile ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
