@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,9 +18,22 @@ serve(async (req) => {
   }
 
   try {
-    const username = Deno.env.get("MSEGAT_USERNAME");
-    const apiKey = Deno.env.get("MSEGAT_API_KEY");
-    const sender = Deno.env.get("MSEGAT_SENDER_NAME");
+    // Try reading provider settings from site_settings first
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const { data: settings } = await supabase
+      .from("site_settings")
+      .select("id, value")
+      .in("id", ["sms_provider_username", "sms_provider_api_key", "sms_provider_sender"]);
+
+    const settingsMap: Record<string, string> = {};
+    (settings || []).forEach((s: any) => { settingsMap[s.id] = s.value; });
+
+    const username = settingsMap["sms_provider_username"] || Deno.env.get("MSEGAT_USERNAME");
+    const apiKey = settingsMap["sms_provider_api_key"] || Deno.env.get("MSEGAT_API_KEY");
+    const sender = settingsMap["sms_provider_sender"] || Deno.env.get("MSEGAT_SENDER_NAME");
 
     if (!username || !apiKey || !sender) {
       throw new Error("MSEGAT credentials not configured");
@@ -59,7 +73,6 @@ serve(async (req) => {
     const result = await response.json();
     console.log("MSEGAT response:", JSON.stringify(result));
 
-    // MSEGAT returns code "1" for success
     if (result.code === "1" || result.code === 1) {
       return new Response(
         JSON.stringify({ success: true, message: "تم إرسال الرسالة بنجاح", result }),
