@@ -32,6 +32,7 @@ const teacherLinks = [
   { to: "/attendance", label: "الحضور والغياب", icon: ClipboardCheck },
   { to: "/grades", label: "الدرجات", icon: GraduationCap },
   { to: "/notifications", label: "الإشعارات", icon: Bell },
+  { to: "/settings", label: "الإعدادات", icon: Settings },
 ];
 
 export default function AppSidebar() {
