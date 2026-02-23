@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,10 @@ import {
   KeyRound,
   Printer,
   Upload,
+  FileSpreadsheet,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -118,6 +122,16 @@ export default function SettingsPage() {
   const [newSection, setNewSection] = useState("");
   const [newGrade, setNewGrade] = useState("الأول الثانوي");
   const [newYear, setNewYear] = useState("1446-1447");
+
+  // Edit class name
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [editingClassName, setEditingClassName] = useState("");
+
+  // Import classes from Excel
+  const [importClassesOpen, setImportClassesOpen] = useState(false);
+  const [importedClasses, setImportedClasses] = useState<{ name: string; grade: string; section: string }[]>([]);
+  const [importingClasses, setImportingClasses] = useState(false);
+  const classFileRef = useRef<HTMLInputElement>(null);
 
   // Edit category
   const [editingCats, setEditingCats] = useState<Record<string, { weight: number; max_score: number }>>({});
@@ -340,6 +354,75 @@ export default function SettingsPage() {
     }
   };
 
+  const handleRenameClass = async (id: string) => {
+    if (!editingClassName.trim()) return;
+    const { error } = await supabase.from("classes").update({ name: editingClassName }).eq("id", id);
+    if (error) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تم التعديل", description: "تم تعديل اسم الشعبة" });
+      setEditingClassId(null);
+      fetchData();
+    }
+  };
+
+  const handleClassFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const XLSX = await import("xlsx");
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
+
+    const columnMap: Record<string, string[]> = {
+      name: ["الشعبة", "اسم الشعبة", "اسم الفصل", "الفصل", "Class", "Name", "name"],
+      grade: ["الصف", "المرحلة", "Grade", "grade"],
+      section: ["رقم الشعبة", "الشعبة رقم", "رقم الفصل", "Section", "section"],
+    };
+
+    const find = (row: Record<string, any>, keys: string[]): string => {
+      for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== "") {
+          return String(row[key]).trim();
+        }
+      }
+      return "";
+    };
+
+    const rows = json
+      .map((row) => ({
+        name: find(row, columnMap.name),
+        grade: find(row, columnMap.grade) || newGrade,
+        section: find(row, columnMap.section) || "",
+      }))
+      .filter((r) => r.name);
+
+    setImportedClasses(rows);
+    if (classFileRef.current) classFileRef.current.value = "";
+  };
+
+  const handleImportClasses = async () => {
+    if (importedClasses.length === 0) return;
+    setImportingClasses(true);
+    const inserts = importedClasses.map((c) => ({
+      name: c.name,
+      grade: c.grade,
+      section: c.section || "1",
+      academic_year: newYear,
+    }));
+    const { error } = await supabase.from("classes").insert(inserts);
+    setImportingClasses(false);
+    if (error) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تمت الإضافة", description: `تم استيراد ${inserts.length} شعبة` });
+      setImportedClasses([]);
+      setImportClassesOpen(false);
+      fetchData();
+    }
+  };
+
   const handleDeleteClass = async (id: string) => {
     const { error } = await supabase.from("classes").delete().eq("id", id);
     if (error) {
@@ -538,56 +621,123 @@ export default function SettingsPage() {
         {/* ===== الشعب ===== */}
         <TabsContent value="classes">
           <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-lg">الشعب الدراسية ({classes.length})</CardTitle>
               {isAdmin && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1.5">
-                      <Plus className="h-4 w-4" />
-                      إضافة شعبة
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent dir="rtl">
-                    <DialogHeader>
-                      <DialogTitle>إضافة شعبة جديدة</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                      <div className="space-y-2">
-                        <Label>اسم الشعبة</Label>
-                        <Input
-                          placeholder="مثال: أول/6"
-                          value={newClassName}
-                          onChange={(e) => setNewClassName(e.target.value)}
-                        />
+                <div className="flex gap-2">
+                  {/* Import from Excel */}
+                  <Dialog open={importClassesOpen} onOpenChange={(v) => { setImportClassesOpen(v); if (!v) setImportedClasses([]); }}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        <Upload className="h-4 w-4" />
+                        استيراد من Excel
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent dir="rtl" className="max-w-xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <FileSpreadsheet className="h-5 w-5" />
+                          استيراد الشعب من ملف Excel
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+                          الأعمدة المدعومة: <strong>اسم الشعبة</strong> (مطلوب)، الصف، رقم الشعبة
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>ملف Excel أو CSV</Label>
+                          <Input ref={classFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleClassFileSelect} className="cursor-pointer" />
+                        </div>
+                        {importedClasses.length > 0 && (
+                          <div className="space-y-2">
+                            <Label>معاينة ({importedClasses.length} شعبة)</Label>
+                            <div className="max-h-[200px] overflow-auto rounded-lg border">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-right">الشعبة</TableHead>
+                                    <TableHead className="text-right">الصف</TableHead>
+                                    <TableHead className="text-right">رقم الشعبة</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {importedClasses.map((c, i) => (
+                                    <TableRow key={i}>
+                                      <TableCell>
+                                        <Input
+                                          value={c.name}
+                                          onChange={(e) => {
+                                            const updated = [...importedClasses];
+                                            updated[i] = { ...updated[i], name: e.target.value };
+                                            setImportedClasses(updated);
+                                          }}
+                                          className="h-8"
+                                        />
+                                      </TableCell>
+                                      <TableCell>{c.grade}</TableCell>
+                                      <TableCell>{c.section || "—"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        <Label>رقم الشعبة</Label>
-                        <Input
-                          placeholder="مثال: 6"
-                          value={newSection}
-                          onChange={(e) => setNewSection(e.target.value)}
-                        />
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline">إلغاء</Button>
+                        </DialogClose>
+                        {importedClasses.length > 0 && (
+                          <Button onClick={handleImportClasses} disabled={importingClasses}>
+                            <Upload className="h-4 w-4 ml-1.5" />
+                            {importingClasses ? "جارٍ الاستيراد..." : `استيراد ${importedClasses.length} شعبة`}
+                          </Button>
+                        )}
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  {/* Add single class */}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        إضافة شعبة
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent dir="rtl">
+                      <DialogHeader>
+                        <DialogTitle>إضافة شعبة جديدة</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label>اسم الشعبة</Label>
+                          <Input placeholder="مثال: أول/6" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>رقم الشعبة</Label>
+                          <Input placeholder="مثال: 6" value={newSection} onChange={(e) => setNewSection(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>الصف</Label>
+                          <Input value={newGrade} onChange={(e) => setNewGrade(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>العام الدراسي</Label>
+                          <Input value={newYear} onChange={(e) => setNewYear(e.target.value)} />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>الصف</Label>
-                        <Input value={newGrade} onChange={(e) => setNewGrade(e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>العام الدراسي</Label>
-                        <Input value={newYear} onChange={(e) => setNewYear(e.target.value)} />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button variant="outline">إلغاء</Button>
-                      </DialogClose>
-                      <DialogClose asChild>
-                        <Button onClick={handleAddClass}>إضافة</Button>
-                      </DialogClose>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline">إلغاء</Button>
+                        </DialogClose>
+                        <DialogClose asChild>
+                          <Button onClick={handleAddClass}>إضافة</Button>
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               )}
             </CardHeader>
             <CardContent>
@@ -605,7 +755,41 @@ export default function SettingsPage() {
                 <TableBody>
                   {classes.map((cls) => (
                     <TableRow key={cls.id}>
-                      <TableCell className="font-medium">{cls.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {isAdmin && editingClassId === cls.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={editingClassName}
+                              onChange={(e) => setEditingClassName(e.target.value)}
+                              className="h-8 w-40"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleRenameClass(cls.id);
+                                if (e.key === "Escape") setEditingClassId(null);
+                              }}
+                            />
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRenameClass(cls.id)}>
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingClassId(null)}>
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span
+                            className={isAdmin ? "cursor-pointer hover:underline" : ""}
+                            onClick={() => {
+                              if (isAdmin) {
+                                setEditingClassId(cls.id);
+                                setEditingClassName(cls.name);
+                              }
+                            }}
+                          >
+                            {cls.name}
+                            {isAdmin && <Pencil className="inline h-3 w-3 mr-1 text-muted-foreground" />}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>{cls.grade}</TableCell>
                       <TableCell>{cls.section}</TableCell>
                       <TableCell>{cls.academic_year}</TableCell>
