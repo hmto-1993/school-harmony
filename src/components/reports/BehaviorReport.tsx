@@ -24,6 +24,7 @@ interface BehaviorReportProps {
   selectedClass: string;
   dateFrom: string;
   dateTo: string;
+  selectedStudent: string;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -38,20 +39,26 @@ const TYPE_COLORS: Record<string, string> = {
   neutral: "hsl(45, 93%, 47%)",
 };
 
-export default function BehaviorReport({ selectedClass, dateFrom, dateTo }: BehaviorReportProps) {
+export default function BehaviorReport({ selectedClass, dateFrom, dateTo, selectedStudent }: BehaviorReportProps) {
   const [data, setData] = useState<BehaviorRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchBehavior = async () => {
     if (!selectedClass) return;
     setLoading(true);
-    const { data: records, error } = await supabase
+    let query = supabase
       .from("behavior_records")
-      .select("type, note, date, students(full_name)")
+      .select("type, note, date, student_id, students(full_name)")
       .eq("class_id", selectedClass)
       .gte("date", dateFrom)
       .lte("date", dateTo)
       .order("date", { ascending: false });
+
+    if (selectedStudent !== "all") {
+      query = query.eq("student_id", selectedStudent);
+    }
+
+    const { data: records, error } = await query;
 
     if (error) {
       toast({ title: "خطأ", description: error.message, variant: "destructive" });
