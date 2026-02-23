@@ -83,13 +83,14 @@
 }
 
 @layer base {
-  * {
+  *, *::before, *::after {
     @apply border-border;
+    letter-spacing: 0 !important;
+    -webkit-text-stroke: 0;
   }
 
   body {
     @apply bg-background text-foreground font-arabic antialiased;
-    font-feature-settings: "ss01", "ss02";
   }
 
   /* RTL scrollbar styling */
