@@ -30,11 +30,13 @@ import {
   GraduationCap,
   Calendar,
   Users,
+  Heart,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import AttendanceChart from "@/components/reports/AttendanceChart";
 import GradesChart from "@/components/reports/GradesChart";
+import BehaviorReport from "@/components/reports/BehaviorReport";
 
 // ============ Types ============
 
@@ -378,6 +380,10 @@ export default function ReportsPage() {
             <GraduationCap className="h-4 w-4" />
             تقرير الدرجات
           </TabsTrigger>
+          <TabsTrigger value="behavior" className="gap-1.5">
+            <Heart className="h-4 w-4" />
+            تقرير السلوك
+          </TabsTrigger>
         </TabsList>
 
         {/* ===== Attendance Report ===== */}
@@ -557,6 +563,11 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* ===== Behavior Report ===== */}
+        <TabsContent value="behavior" className="space-y-4">
+          <BehaviorReport selectedClass={selectedClass} dateFrom={dateFrom} dateTo={dateTo} />
         </TabsContent>
       </Tabs>
     </div>
