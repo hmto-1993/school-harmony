@@ -147,6 +147,7 @@ export default function SettingsPage() {
   const [providerApiKey, setProviderApiKey] = useState("");
   const [providerSender, setProviderSender] = useState("");
   const [savingProvider, setSavingProvider] = useState(false);
+  const [testingSms, setTestingSms] = useState(false);
 
   // New category form
   const [newCatClassId, setNewCatClassId] = useState("");
@@ -1389,10 +1390,38 @@ export default function SettingsPage() {
                     )}
                   </div>
 
-                  <Button onClick={handleSaveProvider} disabled={savingProvider} className="gap-1.5">
-                    <Save className="h-4 w-4" />
-                    {savingProvider ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <Button onClick={handleSaveProvider} disabled={savingProvider} className="gap-1.5">
+                      <Save className="h-4 w-4" />
+                      {savingProvider ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={testingSms || !providerApiKey || !providerSender}
+                      className="gap-1.5"
+                      onClick={async () => {
+                        setTestingSms(true);
+                        try {
+                          const { data, error } = await supabase.functions.invoke("send-sms", {
+                            body: { phone: providerSender, message: "رسالة اختبارية من النظام - Test SMS" },
+                          });
+                          if (error) {
+                            toast({ title: "فشل الاختبار", description: error.message, variant: "destructive" });
+                          } else if (data?.success) {
+                            toast({ title: "نجح الاختبار ✅", description: "تم إرسال الرسالة الاختبارية بنجاح" });
+                          } else {
+                            toast({ title: "فشل الاختبار", description: data?.error || "لم يتم الإرسال", variant: "destructive" });
+                          }
+                        } catch (err: any) {
+                          toast({ title: "خطأ", description: err.message, variant: "destructive" });
+                        }
+                        setTestingSms(false);
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      {testingSms ? "جارٍ الاختبار..." : "اختبار الاتصال"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
