@@ -149,6 +149,11 @@ export default function SettingsPage() {
   const [savingProvider, setSavingProvider] = useState(false);
   const [testingSms, setTestingSms] = useState(false);
 
+  // Login page settings
+  const [loginSchoolName, setLoginSchoolName] = useState("");
+  const [loginSubtitle, setLoginSubtitle] = useState("");
+  const [savingLogin, setSavingLogin] = useState(false);
+
   // New category form
   const [newCatClassId, setNewCatClassId] = useState("");
   const [newCatName, setNewCatName] = useState("");
@@ -228,6 +233,18 @@ export default function SettingsPage() {
         if (s.id === "sms_provider_username") setProviderUsername(s.value || "");
         if (s.id === "sms_provider_api_key") setProviderApiKey(s.value || "");
         if (s.id === "sms_provider_sender") setProviderSender(s.value || "");
+      });
+    }
+
+    // Fetch login page settings
+    if (isAdmin) {
+      const { data: loginData } = await supabase
+        .from("site_settings")
+        .select("id, value")
+        .in("id", ["school_name", "school_subtitle"]);
+      (loginData || []).forEach((s: any) => {
+        if (s.id === "school_name") setLoginSchoolName(s.value || "");
+        if (s.id === "school_subtitle") setLoginSubtitle(s.value || "");
       });
     }
 
@@ -674,6 +691,10 @@ export default function SettingsPage() {
               <TabsTrigger value="sms-provider" className="gap-1.5">
                 <MessageSquare className="h-4 w-4" />
                 مزود SMS
+              </TabsTrigger>
+              <TabsTrigger value="login-page" className="gap-1.5">
+                <SettingsIcon className="h-4 w-4" />
+                صفحة الدخول
               </TabsTrigger>
             </>
           )}
@@ -1422,6 +1443,52 @@ export default function SettingsPage() {
                       {testingSms ? "جارٍ الاختبار..." : "اختبار الاتصال"}
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="login-page">
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="text-lg">إعدادات صفحة تسجيل الدخول</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label>اسم المدرسة</Label>
+                    <Input
+                      value={loginSchoolName}
+                      onChange={(e) => setLoginSchoolName(e.target.value)}
+                      placeholder="مثال: ثانوية الفيصلية"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>الوصف الفرعي</Label>
+                    <Input
+                      value={loginSubtitle}
+                      onChange={(e) => setLoginSubtitle(e.target.value)}
+                      placeholder="مثال: نظام إدارة المدرسة"
+                    />
+                  </div>
+                  <Button
+                    disabled={savingLogin}
+                    className="gap-1.5"
+                    onClick={async () => {
+                      setSavingLogin(true);
+                      const updates = [
+                        supabase.from("site_settings").upsert({ id: "school_name", value: loginSchoolName }),
+                        supabase.from("site_settings").upsert({ id: "school_subtitle", value: loginSubtitle }),
+                      ];
+                      const results = await Promise.all(updates);
+                      setSavingLogin(false);
+                      if (results.some((r) => r.error)) {
+                        toast({ title: "خطأ", description: "فشل حفظ الإعدادات", variant: "destructive" });
+                      } else {
+                        toast({ title: "تم الحفظ", description: "تم تحديث إعدادات صفحة الدخول" });
+                      }
+                    }}
+                  >
+                    <Save className="h-4 w-4" />
+                    {savingLogin ? "جارٍ الحفظ..." : "حفظ"}
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>
