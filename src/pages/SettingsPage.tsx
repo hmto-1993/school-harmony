@@ -670,16 +670,8 @@ export default function SettingsPage() {
             <GraduationCap className="h-4 w-4" />
             فئات التقييم
           </TabsTrigger>
-          <TabsTrigger value="profile" className="gap-1.5">
-            <UserCircle className="h-4 w-4" />
-            الملف الشخصي
-          </TabsTrigger>
           {isAdmin && (
             <>
-              <TabsTrigger value="passwords" className="gap-1.5">
-                <KeyRound className="h-4 w-4" />
-                كلمات المرور
-              </TabsTrigger>
               <TabsTrigger value="new-teacher" className="gap-1.5">
                 <Plus className="h-4 w-4" />
                 إضافة معلم
@@ -687,14 +679,6 @@ export default function SettingsPage() {
               <TabsTrigger value="letterhead" className="gap-1.5">
                 <Printer className="h-4 w-4" />
                 ورقة الطباعة
-              </TabsTrigger>
-              <TabsTrigger value="sms-provider" className="gap-1.5">
-                <MessageSquare className="h-4 w-4" />
-                مزود SMS
-              </TabsTrigger>
-              <TabsTrigger value="login-page" className="gap-1.5">
-                <SettingsIcon className="h-4 w-4" />
-                صفحة الدخول
               </TabsTrigger>
             </>
           )}
@@ -1123,378 +1107,294 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        {/* ===== الملف الشخصي ===== */}
-        <TabsContent value="profile">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-lg">الملف الشخصي</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 max-w-md">
-              <div className="space-y-2">
-                <Label>الاسم الكامل</Label>
-                <Input
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="الاسم الكامل"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>رقم الجوال</Label>
-                <Input
-                  value={profilePhone}
-                  onChange={(e) => setProfilePhone(e.target.value)}
-                  placeholder="05XXXXXXXX"
-                  dir="ltr"
-                  className="text-right"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>رقم الهوية الوطنية</Label>
-                <Input
-                  value={profileNationalId}
-                  onChange={(e) => setProfileNationalId(e.target.value)}
-                  placeholder="1XXXXXXXXX"
-                  dir="ltr"
-                  className="text-right"
-                  inputMode="numeric"
-                />
-                <p className="text-xs text-muted-foreground">
-                  يُستخدم لتسجيل الدخول بدلاً من البريد الإلكتروني
-                </p>
-              </div>
-              <Button onClick={handleSaveProfile} disabled={savingProfile} className="gap-1.5">
-                <Save className="h-4 w-4" />
-                {savingProfile ? "جارٍ الحفظ..." : "حفظ التغييرات"}
-              </Button>
+      </Tabs>
 
-              <div className="border-t pt-4 mt-4 space-y-4">
-                <h3 className="text-base font-semibold">تغيير كلمة المرور</h3>
+      {/* ===== أقسام مستقلة ===== */}
+      <div className="space-y-6 mt-8">
+        {/* ===== الملف الشخصي ===== */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <UserCircle className="h-5 w-5" />
+              الملف الشخصي
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 max-w-md">
+            <div className="space-y-2">
+              <Label>الاسم الكامل</Label>
+              <Input
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="الاسم الكامل"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>رقم الجوال</Label>
+              <Input
+                value={profilePhone}
+                onChange={(e) => setProfilePhone(e.target.value)}
+                placeholder="05XXXXXXXX"
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>رقم الهوية الوطنية</Label>
+              <Input
+                value={profileNationalId}
+                onChange={(e) => setProfileNationalId(e.target.value)}
+                placeholder="1XXXXXXXXX"
+                dir="ltr"
+                className="text-right"
+                inputMode="numeric"
+              />
+              <p className="text-xs text-muted-foreground">
+                يُستخدم لتسجيل الدخول بدلاً من البريد الإلكتروني
+              </p>
+            </div>
+            <Button onClick={handleSaveProfile} disabled={savingProfile} className="gap-1.5">
+              <Save className="h-4 w-4" />
+              {savingProfile ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+            </Button>
+
+            <div className="border-t pt-4 mt-4 space-y-4">
+              <h3 className="text-base font-semibold">تغيير كلمة المرور</h3>
+              <div className="space-y-2">
+                <Label>كلمة المرور الحالية</Label>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="أدخل كلمة المرور الحالية"
+                  dir="ltr"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>كلمة المرور الجديدة</Label>
+                <Input
+                  type="password"
+                  value={newOwnPassword}
+                  onChange={(e) => setNewOwnPassword(e.target.value)}
+                  placeholder="أدخل كلمة المرور الجديدة"
+                  dir="ltr"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>تأكيد كلمة المرور الجديدة</Label>
+                <Input
+                  type="password"
+                  value={confirmOwnPassword}
+                  onChange={(e) => setConfirmOwnPassword(e.target.value)}
+                  placeholder="أعد إدخال كلمة المرور الجديدة"
+                  dir="ltr"
+                />
+              </div>
+              <Button
+                onClick={handleChangeOwnPassword}
+                disabled={changingOwnPassword || !currentPassword.trim() || !newOwnPassword.trim() || !confirmOwnPassword.trim()}
+                className="gap-1.5"
+              >
+                <KeyRound className="h-4 w-4" />
+                {changingOwnPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {isAdmin && (
+          <>
+            {/* ===== كلمات المرور ===== */}
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <KeyRound className="h-5 w-5" />
+                  تغيير كلمة مرور المعلم
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-md">
                 <div className="space-y-2">
-                  <Label>كلمة المرور الحالية</Label>
-                  <Input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="أدخل كلمة المرور الحالية"
-                    dir="ltr"
-                  />
+                  <Label>اختر المعلم</Label>
+                  <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر المعلم" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers.map((t) => (
+                        <SelectItem key={t.user_id} value={t.user_id}>
+                          {t.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>كلمة المرور الجديدة</Label>
                   <Input
                     type="password"
-                    value={newOwnPassword}
-                    onChange={(e) => setNewOwnPassword(e.target.value)}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="أدخل كلمة المرور الجديدة"
                     dir="ltr"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>تأكيد كلمة المرور الجديدة</Label>
-                  <Input
-                    type="password"
-                    value={confirmOwnPassword}
-                    onChange={(e) => setConfirmOwnPassword(e.target.value)}
-                    placeholder="أعد إدخال كلمة المرور الجديدة"
-                    dir="ltr"
-                  />
-                </div>
                 <Button
-                  onClick={handleChangeOwnPassword}
-                  disabled={changingOwnPassword || !currentPassword.trim() || !newOwnPassword.trim() || !confirmOwnPassword.trim()}
+                  onClick={handleChangePassword}
+                  disabled={changingPassword || !selectedTeacher || !newPassword.trim()}
                   className="gap-1.5"
                 >
                   <KeyRound className="h-4 w-4" />
-                  {changingOwnPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
+                  {changingPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        {/* ===== كلمات المرور ===== */}
-        {isAdmin && (
-          <>
-            <TabsContent value="passwords">
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="text-lg">تغيير كلمة مرور المعلم</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 max-w-md">
+              </CardContent>
+            </Card>
+
+            {/* ===== مزود SMS ===== */}
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  إعدادات مزود خدمة SMS
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-md">
+                <div className="space-y-2">
+                  <Label>المزود</Label>
+                  <Select value={smsProvider} onValueChange={setSmsProvider}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="msegat">MSEGAT</SelectItem>
+                      <SelectItem value="unifonic">Unifonic</SelectItem>
+                      <SelectItem value="taqnyat">Taqnyat (تقنيات)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {smsProvider === "msegat" && (
                   <div className="space-y-2">
-                    <Label>اختر المعلم</Label>
-                    <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر المعلم" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teachers.map((t) => (
-                          <SelectItem key={t.user_id} value={t.user_id}>
-                            {t.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>كلمة المرور الجديدة</Label>
+                    <Label>اسم المستخدم</Label>
                     <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="أدخل كلمة المرور الجديدة"
+                      value={providerUsername}
+                      onChange={(e) => setProviderUsername(e.target.value)}
+                      placeholder="اسم مستخدم MSEGAT"
                       dir="ltr"
                     />
                   </div>
-                  <Button
-                    onClick={handleChangePassword}
-                    disabled={changingPassword || !selectedTeacher || !newPassword.trim()}
-                    className="gap-1.5"
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    {changingPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="new-teacher">
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="text-lg">إنشاء حساب معلم جديد</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label>الاسم الكامل</Label>
-                    <Input
-                      value={newTeacherName}
-                      onChange={(e) => setNewTeacherName(e.target.value)}
-                      placeholder="اسم المعلم"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>البريد الإلكتروني</Label>
-                    <Input
-                      type="email"
-                      value={newTeacherEmail}
-                      onChange={(e) => setNewTeacherEmail(e.target.value)}
-                      placeholder="teacher@school.edu.sa"
-                      dir="ltr"
-                      className="text-right"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>رقم الهوية الوطنية</Label>
-                    <Input
-                      value={newTeacherNationalId}
-                      onChange={(e) => setNewTeacherNationalId(e.target.value)}
-                      placeholder="1XXXXXXXXX"
-                      dir="ltr"
-                      className="text-right"
-                      inputMode="numeric"
-                    />
-                    <p className="text-xs text-muted-foreground">يُستخدم لتسجيل الدخول</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>كلمة المرور</Label>
-                    <Input
-                      type="password"
-                      value={newTeacherPassword}
-                      onChange={(e) => setNewTeacherPassword(e.target.value)}
-                      placeholder="كلمة المرور"
-                      dir="ltr"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleCreateTeacher}
-                    disabled={creatingTeacher || !newTeacherName.trim() || !newTeacherEmail.trim() || !newTeacherPassword.trim()}
-                    className="gap-1.5"
-                  >
-                    <Plus className="h-4 w-4" />
-                    {creatingTeacher ? "جارٍ الإنشاء..." : "إنشاء الحساب"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="letterhead">
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="text-lg">ورقة الطباعة للتقارير</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 max-w-lg">
-                  <p className="text-sm text-muted-foreground">
-                    ارفع صورة ترويسة (شعار + بيانات المدرسة) لاستخدامها في طباعة التقارير
-                  </p>
-                  {letterheadUrl && (
-                    <div className="rounded-lg border p-2">
-                      <img
-                        src={letterheadUrl}
-                        alt="ورقة الطباعة الحالية"
-                        className="w-full max-h-48 object-contain"
-                      />
-                    </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>
+                    {smsProvider === "msegat" ? "مفتاح API" : smsProvider === "unifonic" ? "App SID" : "Bearer Token"}
+                  </Label>
+                  <Input
+                    type="password"
+                    value={providerApiKey}
+                    onChange={(e) => setProviderApiKey(e.target.value)}
+                    placeholder={smsProvider === "unifonic" ? "App SID" : smsProvider === "taqnyat" ? "Bearer Token" : "API Key"}
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>اسم المرسل (Sender ID)</Label>
+                  <Input
+                    value={providerSender}
+                    onChange={(e) => setProviderSender(e.target.value)}
+                    placeholder="Sender Name"
+                    dir="ltr"
+                  />
+                  {smsProvider === "unifonic" && (
+                    <p className="text-xs text-muted-foreground">اختياري - سيُستخدم الافتراضي إن ترك فارغاً</p>
                   )}
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      className="gap-1.5"
-                      disabled={uploadingLetterhead}
-                      onClick={() => document.getElementById("letterhead-input")?.click()}
-                    >
-                      <Upload className="h-4 w-4" />
-                      {uploadingLetterhead ? "جارٍ الرفع..." : letterheadUrl ? "تغيير الصورة" : "رفع صورة"}
-                    </Button>
-                    <input
-                      id="letterhead-input"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleUploadLetterhead}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="sms-provider">
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="text-lg">إعدادات مزود خدمة SMS</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label>المزود</Label>
-                    <Select value={smsProvider} onValueChange={setSmsProvider}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="msegat">MSEGAT</SelectItem>
-                        <SelectItem value="unifonic">Unifonic</SelectItem>
-                        <SelectItem value="taqnyat">Taqnyat (تقنيات)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                </div>
 
-                  {smsProvider === "msegat" && (
-                    <div className="space-y-2">
-                      <Label>اسم المستخدم</Label>
-                      <Input
-                        value={providerUsername}
-                        onChange={(e) => setProviderUsername(e.target.value)}
-                        placeholder="اسم مستخدم MSEGAT"
-                        dir="ltr"
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label>
-                      {smsProvider === "msegat" ? "مفتاح API" : smsProvider === "unifonic" ? "App SID" : "Bearer Token"}
-                    </Label>
-                    <Input
-                      type="password"
-                      value={providerApiKey}
-                      onChange={(e) => setProviderApiKey(e.target.value)}
-                      placeholder={smsProvider === "unifonic" ? "App SID" : smsProvider === "taqnyat" ? "Bearer Token" : "API Key"}
-                      dir="ltr"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>اسم المرسل (Sender ID)</Label>
-                    <Input
-                      value={providerSender}
-                      onChange={(e) => setProviderSender(e.target.value)}
-                      placeholder="Sender Name"
-                      dir="ltr"
-                    />
-                    {smsProvider === "unifonic" && (
-                      <p className="text-xs text-muted-foreground">اختياري - سيُستخدم الافتراضي إن ترك فارغاً</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Button onClick={handleSaveProvider} disabled={savingProvider} className="gap-1.5">
-                      <Save className="h-4 w-4" />
-                      {savingProvider ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={testingSms || !providerApiKey || !providerSender}
-                      className="gap-1.5"
-                      onClick={async () => {
-                        setTestingSms(true);
-                        try {
-                          const { data, error } = await supabase.functions.invoke("send-sms", {
-                            body: { phone: providerSender, message: "رسالة اختبارية من النظام - Test SMS" },
-                          });
-                          if (error) {
-                            toast({ title: "فشل الاختبار", description: error.message, variant: "destructive" });
-                          } else if (data?.success) {
-                            toast({ title: "نجح الاختبار ✅", description: "تم إرسال الرسالة الاختبارية بنجاح" });
-                          } else {
-                            toast({ title: "فشل الاختبار", description: data?.error || "لم يتم الإرسال", variant: "destructive" });
-                          }
-                        } catch (err: any) {
-                          toast({ title: "خطأ", description: err.message, variant: "destructive" });
-                        }
-                        setTestingSms(false);
-                      }}
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      {testingSms ? "جارٍ الاختبار..." : "اختبار الاتصال"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="login-page">
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="text-lg">إعدادات صفحة تسجيل الدخول</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label>اسم المدرسة</Label>
-                    <Input
-                      value={loginSchoolName}
-                      onChange={(e) => setLoginSchoolName(e.target.value)}
-                      placeholder="مثال: ثانوية الفيصلية"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>الوصف الفرعي</Label>
-                    <Input
-                      value={loginSubtitle}
-                      onChange={(e) => setLoginSubtitle(e.target.value)}
-                      placeholder="مثال: نظام إدارة المدرسة"
-                    />
-                  </div>
+                <div className="flex items-center gap-3">
+                  <Button onClick={handleSaveProvider} disabled={savingProvider} className="gap-1.5">
+                    <Save className="h-4 w-4" />
+                    {savingProvider ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
+                  </Button>
                   <Button
-                    disabled={savingLogin}
+                    variant="outline"
+                    disabled={testingSms || !providerApiKey || !providerSender}
                     className="gap-1.5"
                     onClick={async () => {
-                      setSavingLogin(true);
-                      const updates = [
-                        supabase.from("site_settings").upsert({ id: "school_name", value: loginSchoolName }),
-                        supabase.from("site_settings").upsert({ id: "school_subtitle", value: loginSubtitle }),
-                      ];
-                      const results = await Promise.all(updates);
-                      setSavingLogin(false);
-                      if (results.some((r) => r.error)) {
-                        toast({ title: "خطأ", description: "فشل حفظ الإعدادات", variant: "destructive" });
-                      } else {
-                        toast({ title: "تم الحفظ", description: "تم تحديث إعدادات صفحة الدخول" });
+                      setTestingSms(true);
+                      try {
+                        const { data, error } = await supabase.functions.invoke("send-sms", {
+                          body: { phone: providerSender, message: "رسالة اختبارية من النظام - Test SMS" },
+                        });
+                        if (error) {
+                          toast({ title: "فشل الاختبار", description: error.message, variant: "destructive" });
+                        } else if (data?.success) {
+                          toast({ title: "نجح الاختبار ✅", description: "تم إرسال الرسالة الاختبارية بنجاح" });
+                        } else {
+                          toast({ title: "فشل الاختبار", description: data?.error || "لم يتم الإرسال", variant: "destructive" });
+                        }
+                      } catch (err: any) {
+                        toast({ title: "خطأ", description: err.message, variant: "destructive" });
                       }
+                      setTestingSms(false);
                     }}
                   >
-                    <Save className="h-4 w-4" />
-                    {savingLogin ? "جارٍ الحفظ..." : "حفظ"}
+                    <MessageSquare className="h-4 w-4" />
+                    {testingSms ? "جارٍ الاختبار..." : "اختبار الاتصال"}
                   </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ===== صفحة الدخول ===== */}
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <SettingsIcon className="h-5 w-5" />
+                  إعدادات صفحة تسجيل الدخول
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-md">
+                <div className="space-y-2">
+                  <Label>اسم المدرسة</Label>
+                  <Input
+                    value={loginSchoolName}
+                    onChange={(e) => setLoginSchoolName(e.target.value)}
+                    placeholder="مثال: ثانوية الفيصلية"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>الوصف الفرعي</Label>
+                  <Input
+                    value={loginSubtitle}
+                    onChange={(e) => setLoginSubtitle(e.target.value)}
+                    placeholder="مثال: نظام إدارة المدرسة"
+                  />
+                </div>
+                <Button
+                  disabled={savingLogin}
+                  className="gap-1.5"
+                  onClick={async () => {
+                    setSavingLogin(true);
+                    const updates = [
+                      supabase.from("site_settings").upsert({ id: "school_name", value: loginSchoolName }),
+                      supabase.from("site_settings").upsert({ id: "school_subtitle", value: loginSubtitle }),
+                    ];
+                    const results = await Promise.all(updates);
+                    setSavingLogin(false);
+                    if (results.some((r) => r.error)) {
+                      toast({ title: "خطأ", description: "فشل حفظ الإعدادات", variant: "destructive" });
+                    } else {
+                      toast({ title: "تم الحفظ", description: "تم تحديث إعدادات صفحة الدخول" });
+                    }
+                  }}
+                >
+                  <Save className="h-4 w-4" />
+                  {savingLogin ? "جارٍ الحفظ..." : "حفظ"}
+                </Button>
+              </CardContent>
+            </Card>
           </>
         )}
-      </Tabs>
+      </div>
     </div>
   );
 }
