@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CheckCircle2 } from "lucide-react";
+import { Save, CheckCircle2, CalendarIcon, Filter } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type AttendanceStatus = "present" | "absent" | "late" | "early_leave" | "sick_leave";
 
@@ -35,7 +39,10 @@ export default function AttendancePage() {
   const [selectedClass, setSelectedClass] = useState("");
   const [records, setRecords] = useState<StudentAttendance[]>([]);
   const [saving, setSaving] = useState(false);
-  const [date] = useState(() => new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [statusFilter, setStatusFilter] = useState<AttendanceStatus | "all">("all");
+
+  const date = format(selectedDate, "yyyy-MM-dd");
 
   useEffect(() => {
     supabase.from("classes").select("id, name").order("name").then(({ data }) => {
@@ -46,7 +53,7 @@ export default function AttendancePage() {
   useEffect(() => {
     if (!selectedClass) return;
     loadStudents();
-  }, [selectedClass]);
+  }, [selectedClass, date]);
 
   const loadStudents = async () => {
     // جلب طلاب الشعبة
@@ -128,11 +135,32 @@ export default function AttendancePage() {
     loadStudents(); // إعادة التحميل لتحديث المعرفات
   };
 
+  const filteredRecords = statusFilter === "all" ? records : records.filter((r) => r.status === statusFilter);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold">تسجيل الحضور والغياب</h1>
-        <p className="text-muted-foreground">تاريخ اليوم: {new Date(date).toLocaleDateString("ar-SA")}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-muted-foreground">التاريخ:</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("gap-1.5 font-normal")}>
+                <CalendarIcon className="h-4 w-4" />
+                {new Date(date).toLocaleDateString("ar-SA")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(d) => d && setSelectedDate(d)}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       <Card className="shadow-card">
@@ -158,11 +186,30 @@ export default function AttendancePage() {
             </p>
           ) : (
             <>
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 items-center">
                 <Button variant="outline" size="sm" onClick={markAllPresent}>
                   <CheckCircle2 className="h-4 w-4 ml-1" />
                   تحديد الكل حاضر
                 </Button>
+                <div className="flex items-center gap-1.5 mr-auto">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as AttendanceStatus | "all")}>
+                    <SelectTrigger className="w-40 h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">الكل ({records.length})</SelectItem>
+                      {statusOptions.map((opt) => {
+                        const count = records.filter((r) => r.status === opt.value).length;
+                        return (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label} ({count})
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="rounded-lg border overflow-hidden">
                 <Table>
@@ -175,9 +222,9 @@ export default function AttendancePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.map((record, i) => (
+                    {filteredRecords.map((record, i) => (
                       <TableRow key={record.student_id}>
-                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="text-muted-foreground">{records.indexOf(record) + 1}</TableCell>
                         <TableCell className="font-medium">{record.full_name}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
