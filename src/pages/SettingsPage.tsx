@@ -31,7 +31,9 @@ import {
   Check,
   X,
   MessageSquare,
+  ChevronDown,
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -1112,14 +1114,21 @@ export default function SettingsPage() {
       {/* ===== أقسام مستقلة ===== */}
       <div className="space-y-6 mt-8">
         {/* ===== الملف الشخصي ===== */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <UserCircle className="h-5 w-5" />
-              الملف الشخصي
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 max-w-md">
+        <Collapsible defaultOpen>
+          <Card className="shadow-card">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer select-none hover:bg-muted/50 transition-colors rounded-t-lg">
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <UserCircle className="h-5 w-5" />
+                    الملف الشخصي
+                  </span>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4 max-w-md">
             <div className="space-y-2">
               <Label>الاسم الكامل</Label>
               <Input
@@ -1198,20 +1207,29 @@ export default function SettingsPage() {
                 {changingOwnPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {isAdmin && (
           <>
             {/* ===== كلمات المرور ===== */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <KeyRound className="h-5 w-5" />
-                  تغيير كلمة مرور المعلم
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 max-w-md">
+            <Collapsible>
+              <Card className="shadow-card">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer select-none hover:bg-muted/50 transition-colors rounded-t-lg">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <KeyRound className="h-5 w-5" />
+                        تغيير كلمة مرور المعلم
+                      </span>
+                      <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4 max-w-md">
                 <div className="space-y-2">
                   <Label>اختر المعلم</Label>
                   <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
@@ -1245,18 +1263,27 @@ export default function SettingsPage() {
                   <KeyRound className="h-4 w-4" />
                   {changingPassword ? "جارٍ التغيير..." : "تغيير كلمة المرور"}
                 </Button>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
             {/* ===== مزود SMS ===== */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  إعدادات مزود خدمة SMS
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 max-w-md">
+            <Collapsible>
+              <Card className="shadow-card">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer select-none hover:bg-muted/50 transition-colors rounded-t-lg">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5" />
+                        إعدادات مزود خدمة SMS
+                      </span>
+                      <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4 max-w-md">
                 <div className="space-y-2">
                   <Label>المزود</Label>
                   <Select value={smsProvider} onValueChange={setSmsProvider}>
@@ -1341,18 +1368,27 @@ export default function SettingsPage() {
                     {testingSms ? "جارٍ الاختبار..." : "اختبار الاتصال"}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
             {/* ===== صفحة الدخول ===== */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <SettingsIcon className="h-5 w-5" />
-                  إعدادات صفحة تسجيل الدخول
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 max-w-md">
+            <Collapsible>
+              <Card className="shadow-card">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer select-none hover:bg-muted/50 transition-colors rounded-t-lg">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <SettingsIcon className="h-5 w-5" />
+                        إعدادات صفحة تسجيل الدخول
+                      </span>
+                      <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4 max-w-md">
                 <div className="space-y-2">
                   <Label>اسم المدرسة</Label>
                   <Input
@@ -1390,8 +1426,10 @@ export default function SettingsPage() {
                   <Save className="h-4 w-4" />
                   {savingLogin ? "جارٍ الحفظ..." : "حفظ"}
                 </Button>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           </>
         )}
       </div>
