@@ -4,15 +4,19 @@ import { ClipboardList, BarChart3, UserCheck } from "lucide-react";
 import DailyGradeEntry from "@/components/grades/DailyGradeEntry";
 import GradesSummary from "@/components/grades/GradesSummary";
 import BehaviorEntry from "@/components/grades/BehaviorEntry";
+import NoorExportDialog from "@/components/grades/NoorExportDialog";
 
 export default function GradesPage() {
   const [selectedClass, setSelectedClass] = useState("");
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold">الدرجات والتقييمات</h1>
-        <p className="text-muted-foreground">إدخال وعرض درجات الطلاب حسب فئات التقييم</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">الدرجات والتقييمات</h1>
+          <p className="text-muted-foreground">إدخال وعرض درجات الطلاب حسب فئات التقييم</p>
+        </div>
+        <NoorExportDialog />
       </div>
 
       <Tabs defaultValue="daily" dir="rtl">
