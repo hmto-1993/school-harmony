@@ -22,7 +22,7 @@ interface AuthContextType {
   student: StudentData | null;
   isStudent: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signInStudent: (national_id: string, academic_number: string) => Promise<{ error: string | null }>;
+  signInStudent: (national_id: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -80,10 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signInStudent = async (national_id: string, academic_number: string) => {
+  const signInStudent = async (national_id: string) => {
     try {
       const { data, error } = await supabase.functions.invoke("student-login", {
-        body: { national_id, academic_number },
+        body: { national_id },
       });
       if (error) return { error: "حدث خطأ في الاتصال" };
       if (data?.error) return { error: data.error as string };

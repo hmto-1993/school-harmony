@@ -11,11 +11,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { national_id, academic_number } = await req.json();
+    const { national_id } = await req.json();
 
-    if (!national_id || !academic_number) {
+    if (!national_id) {
       return new Response(
-        JSON.stringify({ error: "رقم الهوية والرقم الأكاديمي مطلوبان" }),
+        JSON.stringify({ error: "رقم الهوية الوطنية مطلوب" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -24,17 +24,16 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify student credentials
+    // Verify student by national_id only
     const { data: student, error } = await supabase
       .from("students")
       .select("id, full_name, class_id, national_id, academic_number, parent_phone")
       .eq("national_id", national_id)
-      .eq("academic_number", academic_number)
       .single();
 
     if (error || !student) {
       return new Response(
-        JSON.stringify({ error: "رقم الهوية أو الرقم الأكاديمي غير صحيح" }),
+        JSON.stringify({ error: "رقم الهوية الوطنية غير مسجل" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -16,7 +16,6 @@ export default function LoginPage() {
   const [nationalId, setNationalId] = useState("");
   const [password, setPassword] = useState("");
   const [studentNationalId, setStudentNationalId] = useState("");
-  const [academicNumber, setAcademicNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [schoolName, setSchoolName] = useState("ثانوية الفيصلية");
   const [schoolSubtitle, setSchoolSubtitle] = useState("نظام إدارة المدرسة");
@@ -79,10 +78,10 @@ export default function LoginPage() {
 
   const handleStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentNationalId.trim() || !academicNumber.trim()) return;
+    if (!studentNationalId.trim()) return;
 
     setLoading(true);
-    const { error } = await signInStudent(studentNationalId, academicNumber);
+    const { error } = await signInStudent(studentNationalId);
     setLoading(false);
 
     if (error) {
@@ -169,20 +168,6 @@ export default function LoginPage() {
                       placeholder="1234567890"
                       value={studentNationalId}
                       onChange={(e) => setStudentNationalId(e.target.value)}
-                      dir="ltr"
-                      className="text-right"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="academic-number">الرقم الأكاديمي</Label>
-                    <Input
-                      id="academic-number"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="الرقم الأكاديمي"
-                      value={academicNumber}
-                      onChange={(e) => setAcademicNumber(e.target.value)}
                       dir="ltr"
                       className="text-right"
                       required
