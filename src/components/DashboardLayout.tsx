@@ -6,7 +6,7 @@ export default function DashboardLayout() {
   const { user } = useAuth();
 
   return (
-    <div className="flex flex-row-reverse min-h-screen w-full bg-background" dir="rtl">
+    <div className="flex min-h-screen w-full bg-background" dir="rtl">
       <AppSidebar />
       <main className="flex-1 overflow-auto" dir="rtl">
         <div className="p-6 max-w-7xl mx-auto">
