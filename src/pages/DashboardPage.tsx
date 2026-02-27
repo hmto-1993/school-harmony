@@ -4,14 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Users, BookOpen, ClipboardCheck, AlertTriangle,
-  TrendingUp, TrendingDown, Clock, Heart, UserCheck, UserX,
+  TrendingUp, Clock, UserCheck, UserX,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import { format } from "date-fns";
 import PeriodComparison from "@/components/dashboard/PeriodComparison";
+import ClassGradesComparison from "@/components/dashboard/ClassGradesComparison";
 
 interface ClassStats {
   name: string;
@@ -29,9 +29,6 @@ export default function DashboardPage() {
   const [todayAbsent, setTodayAbsent] = useState(0);
   const [todayLate, setTodayLate] = useState(0);
   const [todayNotRecorded, setTodayNotRecorded] = useState(0);
-  const [behaviorPositive, setBehaviorPositive] = useState(0);
-  const [behaviorNegative, setBehaviorNegative] = useState(0);
-  const [behaviorNeutral, setBehaviorNeutral] = useState(0);
   const [classStats, setClassStats] = useState<ClassStats[]>([]);
   const [attendanceRate, setAttendanceRate] = useState(0);
 
@@ -46,18 +43,15 @@ export default function DashboardPage() {
       { data: studentsData },
       { data: classesData },
       { data: attendanceData },
-      { data: behaviorData },
     ] = await Promise.all([
       supabase.from("students").select("id, class_id"),
       supabase.from("classes").select("id, name"),
       supabase.from("attendance_records").select("student_id, status, class_id").eq("date", today),
-      supabase.from("behavior_records").select("type").eq("date", today),
     ]);
 
     const students = studentsData || [];
     const classes = classesData || [];
     const attendance = attendanceData || [];
-    const behavior = behaviorData || [];
 
     setTotalStudents(students.length);
     setTotalClasses(classes.length);
@@ -73,10 +67,6 @@ export default function DashboardPage() {
     setTodayLate(late);
     setTodayNotRecorded(notRecorded > 0 ? notRecorded : 0);
     setAttendanceRate(students.length > 0 ? Math.round((present / students.length) * 100) : 0);
-
-    setBehaviorPositive(behavior.filter((b) => b.type === "positive").length);
-    setBehaviorNegative(behavior.filter((b) => b.type === "negative").length);
-    setBehaviorNeutral(behavior.filter((b) => b.type === "neutral").length);
 
     // Per-class attendance stats
     const classMap: Record<string, ClassStats> = {};
@@ -104,14 +94,6 @@ export default function DashboardPage() {
   ].filter((d) => d.value > 0);
 
   const PIE_COLORS = ["hsl(142, 71%, 45%)", "hsl(0, 84%, 60%)", "hsl(45, 93%, 47%)", "hsl(215, 15%, 70%)"];
-
-  const behaviorPieData = [
-    { name: "إيجابي", value: behaviorPositive },
-    { name: "سلبي", value: behaviorNegative },
-    { name: "محايد", value: behaviorNeutral },
-  ].filter((d) => d.value > 0);
-
-  const BEHAVIOR_COLORS = ["hsl(142, 71%, 45%)", "hsl(0, 84%, 60%)", "hsl(45, 93%, 47%)"];
 
   const statCards = [
     { label: "إجمالي الطلاب", value: totalStudents, icon: Users, color: "text-primary", bg: "bg-primary/10" },
@@ -146,7 +128,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Charts Row */}
+      {/* Attendance Pie + Class Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Attendance Pie */}
         <Card className="shadow-card">
@@ -184,122 +166,63 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Behavior Pie */}
-        <Card className="shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Heart className="h-4 w-4" />
-              سلوك الطلاب اليوم
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {behaviorPieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={behaviorPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {behaviorPieData.map((_, i) => (
-                      <Cell key={i} fill={BEHAVIOR_COLORS[i % BEHAVIOR_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-center text-sm text-muted-foreground py-12">لا توجد بيانات سلوك اليوم</p>
-            )}
-          </CardContent>
-        </Card>
+        {/* Per-Class Summary Table */}
+        {classStats.length > 0 && (
+          <Card className="shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                ملخص الشُعب
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-right p-2.5 font-medium">الشُعبة</th>
+                      <th className="text-center p-2.5 font-medium">عدد الطلاب</th>
+                      <th className="text-center p-2.5 font-medium">حاضر</th>
+                      <th className="text-center p-2.5 font-medium">غائب</th>
+                      <th className="text-center p-2.5 font-medium">متأخر</th>
+                      <th className="text-center p-2.5 font-medium">نسبة الحضور</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classStats.map((cls) => {
+                      const rate = cls.total > 0 ? Math.round((cls.present / cls.total) * 100) : 0;
+                      return (
+                        <tr key={cls.name} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="p-2.5 font-medium">{cls.name}</td>
+                          <td className="p-2.5 text-center">{cls.total}</td>
+                          <td className="p-2.5 text-center text-green-600 font-medium">{cls.present}</td>
+                          <td className="p-2.5 text-center text-destructive font-medium">{cls.absent}</td>
+                          <td className="p-2.5 text-center text-yellow-600 font-medium">{cls.late}</td>
+                          <td className="p-2.5 text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                              rate >= 80 ? "bg-green-100 text-green-700" :
+                              rate >= 50 ? "bg-yellow-100 text-yellow-700" :
+                              "bg-red-100 text-red-700"
+                            }`}>
+                              {rate}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Per-Class Attendance Bar Chart */}
-      {classStats.length > 0 && (
-        <Card className="shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              الحضور حسب الشُعبة
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={classStats} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="present" name="حاضر" fill="hsl(142, 71%, 45%)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="absent" name="غائب" fill="hsl(0, 84%, 60%)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="late" name="متأخر" fill="hsl(45, 93%, 47%)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Per-Class Summary Table (numbers only, no names) */}
-      {classStats.length > 0 && (
-        <Card className="shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              ملخص الشُعب
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-right p-2.5 font-medium">الشُعبة</th>
-                    <th className="text-center p-2.5 font-medium">عدد الطلاب</th>
-                    <th className="text-center p-2.5 font-medium">حاضر</th>
-                    <th className="text-center p-2.5 font-medium">غائب</th>
-                    <th className="text-center p-2.5 font-medium">متأخر</th>
-                    <th className="text-center p-2.5 font-medium">نسبة الحضور</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {classStats.map((cls) => {
-                    const rate = cls.total > 0 ? Math.round((cls.present / cls.total) * 100) : 0;
-                    return (
-                      <tr key={cls.name} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="p-2.5 font-medium">{cls.name}</td>
-                        <td className="p-2.5 text-center">{cls.total}</td>
-                        <td className="p-2.5 text-center text-green-600 font-medium">{cls.present}</td>
-                        <td className="p-2.5 text-center text-destructive font-medium">{cls.absent}</td>
-                        <td className="p-2.5 text-center text-yellow-600 font-medium">{cls.late}</td>
-                        <td className="p-2.5 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                            rate >= 80 ? "bg-green-100 text-green-700" :
-                            rate >= 50 ? "bg-yellow-100 text-yellow-700" :
-                            "bg-red-100 text-red-700"
-                          }`}>
-                            {rate}%
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Weekly & Monthly Comparison */}
+      {/* Weekly & Monthly Comparison (tabbed) */}
       <PeriodComparison />
+
+      {/* Class Grades Comparison */}
+      <ClassGradesComparison />
     </div>
   );
 }
