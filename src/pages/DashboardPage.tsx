@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import PeriodComparison from "@/components/dashboard/PeriodComparison";
 import ClassGradesComparison from "@/components/dashboard/ClassGradesComparison";
+import PerformanceDashboard from "@/components/dashboard/PerformanceDashboard";
 
 interface ClassStats {
   name: string;
@@ -223,6 +224,9 @@ export default function DashboardPage() {
 
       {/* Class Grades Comparison */}
       <ClassGradesComparison />
+
+      {/* Performance Dashboard */}
+      <PerformanceDashboard />
     </div>
   );
 }
