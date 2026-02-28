@@ -105,6 +105,7 @@ export default function SettingsPage() {
   const [newTeacherPassword, setNewTeacherPassword] = useState("");
   const [newTeacherNationalId, setNewTeacherNationalId] = useState("");
   const [creatingTeacher, setCreatingTeacher] = useState(false);
+  const [newTeacherRole, setNewTeacherRole] = useState<"admin" | "teacher">("teacher");
 
   // Letterhead
   const [letterheadUrl, setLetterheadUrl] = useState("");
@@ -352,7 +353,7 @@ export default function SettingsPage() {
         email: newTeacherEmail,
         password: newTeacherPassword,
         full_name: newTeacherName,
-        role: "teacher",
+        role: newTeacherRole,
       },
     });
 
@@ -1109,6 +1110,119 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* ===== إضافة معلم ===== */}
+        {isAdmin && (
+          <TabsContent value="new-teacher">
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg">إضافة معلم جديد</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-md">
+                <div className="space-y-2">
+                  <Label>الاسم الكامل</Label>
+                  <Input
+                    value={newTeacherName}
+                    onChange={(e) => setNewTeacherName(e.target.value)}
+                    placeholder="اسم المعلم"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>البريد الإلكتروني</Label>
+                  <Input
+                    type="email"
+                    value={newTeacherEmail}
+                    onChange={(e) => setNewTeacherEmail(e.target.value)}
+                    placeholder="teacher@school.edu.sa"
+                    dir="ltr"
+                    className="text-right"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>رقم الهوية الوطنية</Label>
+                  <Input
+                    value={newTeacherNationalId}
+                    onChange={(e) => setNewTeacherNationalId(e.target.value)}
+                    placeholder="1XXXXXXXXX"
+                    dir="ltr"
+                    className="text-right"
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>كلمة المرور</Label>
+                  <Input
+                    type="password"
+                    value={newTeacherPassword}
+                    onChange={(e) => setNewTeacherPassword(e.target.value)}
+                    placeholder="كلمة مرور قوية"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>الصلاحية</Label>
+                  <Select value={newTeacherRole} onValueChange={(v: "admin" | "teacher") => setNewTeacherRole(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="teacher">معلم</SelectItem>
+                      <SelectItem value="admin">مدير (صلاحيات كاملة)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={handleCreateTeacher}
+                  disabled={creatingTeacher || !newTeacherName.trim() || !newTeacherEmail.trim() || !newTeacherPassword.trim()}
+                  className="gap-1.5"
+                >
+                  <Plus className="h-4 w-4" />
+                  {creatingTeacher ? "جارٍ الإنشاء..." : "إنشاء الحساب"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* ===== ورقة الطباعة ===== */}
+        {isAdmin && (
+          <TabsContent value="letterhead">
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg">ورقة الطباعة (الترويسة)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-lg">
+                <p className="text-sm text-muted-foreground">
+                  ارفع صورة الترويسة التي ستظهر أعلى التقارير والمطبوعات
+                </p>
+                <div className="space-y-2">
+                  <Label>رفع صورة الترويسة</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUploadLetterhead}
+                    disabled={uploadingLetterhead}
+                    className="cursor-pointer"
+                  />
+                  {uploadingLetterhead && (
+                    <p className="text-xs text-muted-foreground">جارٍ الرفع...</p>
+                  )}
+                </div>
+                {letterheadUrl && (
+                  <div className="space-y-2">
+                    <Label>المعاينة الحالية</Label>
+                    <div className="rounded-lg border p-2 bg-white">
+                      <img
+                        src={letterheadUrl}
+                        alt="ورقة الطباعة"
+                        className="max-h-40 w-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ===== أقسام مستقلة ===== */}
